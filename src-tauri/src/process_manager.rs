@@ -56,6 +56,7 @@ pub struct ProcessManager {
     log_dir: Option<Arc<PathBuf>>,
     log_retention_days: Arc<AtomicU64>,
     /// Cached login-shell PATH, resolved once at startup on macOS/Linux.
+    #[cfg(unix)]
     shell_path: Arc<Mutex<Option<String>>>,
 }
 
