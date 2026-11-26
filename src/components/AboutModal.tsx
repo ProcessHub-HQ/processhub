@@ -34,7 +34,7 @@ export function AboutModal({
         </div>
         <div>
           <span>Version</span>
-          <strong>0.1.0</strong>
+          <strong>{__APP_VERSION__}</strong>
         </div>
         <div>
           <span>Website</span>
