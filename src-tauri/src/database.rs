@@ -2,7 +2,7 @@ use crate::models::{ActiveProcessRecord, EnvironmentVariable, RunHistory, Servic
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 use std::path::Path;
 
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 
 pub struct Database {
     connection: Connection,
@@ -117,6 +117,14 @@ impl Database {
             )?;
             tx.commit()?;
         }
+        if version < 6 {
+            let tx = self.connection.transaction()?;
+            tx.execute_batch(
+                "ALTER TABLE services ADD COLUMN log_max_size_mb INTEGER NOT NULL DEFAULT 10;
+                PRAGMA user_version = 6;",
+            )?;
+            tx.commit()?;
+        }
         Ok(())
     }
 
@@ -209,17 +217,18 @@ impl Database {
     pub fn insert_service(&mut self, service: &Service) -> rusqlite::Result<()> {
         let restart_delay_ms = millis_to_sql(service.restart_delay_ms)?;
         let stop_grace_period_ms = millis_to_sql(service.stop_grace_period_ms)?;
+        let log_max_size_mb = millis_to_sql(service.log_max_size_mb)?;
         let tx = self.connection.transaction()?;
         tx.execute(
             "INSERT INTO services (id,name,description,icon_path,group_id,execution_mode,executable,arguments_json,
                 shell_command,working_directory,enabled,auto_start,restart_policy,restart_delay_ms,max_restart_attempts,
-                priority,stop_grace_period_ms,sort_order)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
+                priority,stop_grace_period_ms,sort_order,log_max_size_mb)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
             params![service.id, service.name, service.description, service.icon_path, service.group_id,
                 service.execution_mode, service.executable, serde_json::to_string(&service.arguments).unwrap_or_else(|_| "[]".into()),
                 service.shell_command, service.working_directory, service.enabled, service.auto_start,
                 service.restart_policy, restart_delay_ms, service.max_restart_attempts,
-                service.priority, stop_grace_period_ms, service.sort_order],
+                service.priority, stop_grace_period_ms, service.sort_order, log_max_size_mb],
         )?;
         replace_environment(&tx, service)?;
         tx.commit()
@@ -228,17 +237,18 @@ impl Database {
     pub fn update_service(&mut self, service: &Service) -> rusqlite::Result<()> {
         let restart_delay_ms = millis_to_sql(service.restart_delay_ms)?;
         let stop_grace_period_ms = millis_to_sql(service.stop_grace_period_ms)?;
+        let log_max_size_mb = millis_to_sql(service.log_max_size_mb)?;
         let tx = self.connection.transaction()?;
         let changed = tx.execute(
             "UPDATE services SET name=?2,description=?3,icon_path=?4,group_id=?5,execution_mode=?6,
                 executable=?7,arguments_json=?8,shell_command=?9,working_directory=?10,enabled=?11,auto_start=?12,
                 restart_policy=?13,restart_delay_ms=?14,max_restart_attempts=?15,priority=?16,
-                stop_grace_period_ms=?17,sort_order=?18,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
+                stop_grace_period_ms=?17,sort_order=?18,log_max_size_mb=?19,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
             params![service.id, service.name, service.description, service.icon_path, service.group_id,
                 service.execution_mode, service.executable, serde_json::to_string(&service.arguments).unwrap_or_else(|_| "[]".into()),
                 service.shell_command, service.working_directory, service.enabled, service.auto_start,
                 service.restart_policy, restart_delay_ms, service.max_restart_attempts,
-                service.priority, stop_grace_period_ms, service.sort_order],
+                service.priority, stop_grace_period_ms, service.sort_order, log_max_size_mb],
         )?;
         if changed == 0 {
             return Err(rusqlite::Error::QueryReturnedNoRows);
@@ -250,7 +260,7 @@ impl Database {
     pub fn get_service(&self, id: &str) -> rusqlite::Result<Option<Service>> {
         let mut statement = self.connection.prepare("SELECT id,name,description,icon_path,group_id,execution_mode,
             executable,arguments_json,shell_command,working_directory,enabled,auto_start,restart_policy,restart_delay_ms,
-            max_restart_attempts,priority,stop_grace_period_ms,created_at,updated_at,sort_order FROM services WHERE id=?1")?;
+            max_restart_attempts,priority,stop_grace_period_ms,created_at,updated_at,sort_order,log_max_size_mb FROM services WHERE id=?1")?;
         let service = statement.query_row([id], service_from_row).optional()?;
         service
             .map(|mut service| {
@@ -263,7 +273,7 @@ impl Database {
     pub fn list_services(&self) -> rusqlite::Result<Vec<Service>> {
         let mut statement = self.connection.prepare("SELECT id,name,description,icon_path,group_id,execution_mode,
             executable,arguments_json,shell_command,working_directory,enabled,auto_start,restart_policy,restart_delay_ms,
-            max_restart_attempts,priority,stop_grace_period_ms,created_at,updated_at,sort_order
+            max_restart_attempts,priority,stop_grace_period_ms,created_at,updated_at,sort_order,log_max_size_mb
             FROM services ORDER BY sort_order,name COLLATE NOCASE")?;
         let mut services = statement
             .query_map([], service_from_row)?
@@ -279,19 +289,6 @@ impl Database {
             .connection
             .execute("DELETE FROM services WHERE id=?1", [id])?
             > 0)
-    }
-
-    pub fn duplicate_service(&mut self, id: &str) -> rusqlite::Result<Option<Service>> {
-        let Some(mut service) = self.get_service(id)? else {
-            return Ok(None);
-        };
-        service.id = uuid::Uuid::new_v4().to_string();
-        service.name = format!("{} (copy)", service.name);
-        service.sort_order += 1;
-        service.created_at.clear();
-        service.updated_at.clear();
-        self.insert_service(&service)?;
-        self.get_service(&service.id)
     }
 
     pub fn get_setting(&self, key: &str) -> rusqlite::Result<Option<serde_json::Value>> {
@@ -425,6 +422,7 @@ fn service_from_row(row: &Row<'_>) -> rusqlite::Result<Service> {
         created_at: row.get(17)?,
         updated_at: row.get(18)?,
         sort_order: row.get(19)?,
+        log_max_size_mb: millis_from_row(row, 20)?,
     })
 }
 
@@ -469,6 +467,7 @@ mod tests {
             max_restart_attempts: Some(5),
             priority: "normal".into(),
             stop_grace_period_ms: 3000,
+            log_max_size_mb: 10,
         })
         .expect("valid service")
     }

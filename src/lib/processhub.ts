@@ -17,8 +17,6 @@ export const processHub = {
   deleteService: (id: string) => invoke<boolean>("delete_service", { id }),
   importServiceIcon: (sourcePath: string) =>
     invoke<string>("import_service_icon", { sourcePath }),
-  duplicateService: (id: string) =>
-    invoke<Service | null>("duplicate_service", { id }),
   getSetting: <T>(key: string) => invoke<T | null>("get_app_setting", { key }),
   setSetting: (key: string, value: unknown) =>
     invoke<void>("set_app_setting", { key, value }),

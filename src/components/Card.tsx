@@ -15,6 +15,7 @@ export function Card({
   return (
     <button
       {...props}
+      data-service-card=""
       type={type}
       className={["process-item", selected && "selected", className]
         .filter(Boolean)

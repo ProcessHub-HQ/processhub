@@ -185,19 +185,6 @@ fn copy_icon_to_directory(
 }
 
 #[tauri::command]
-fn duplicate_service(
-    id: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<Option<Service>, String> {
-    state
-        .database
-        .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?
-        .duplicate_service(&id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 fn get_app_setting(
     key: String,
     state: tauri::State<'_, AppState>,
@@ -525,15 +512,24 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 pm_for_path.init_shell_path().await;
             });
+            let start_minimized = database
+                .get_setting("startMinimized")
+                .ok()
+                .flatten()
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
             app.manage(AppState {
                 database: Mutex::new(database),
                 processes: process_manager,
                 session_id: uuid::Uuid::new_v4().to_string(),
             });
-            // Window starts hidden (visible:false in tauri.conf.json).
-            // On macOS, hide the Dock icon until the user opens the window.
-            #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            if start_minimized {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+                #[cfg(target_os = "macos")]
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            }
 
             let show_item =
                 tauri::menu::MenuItem::with_id(app, "show", "Open ProcessHub", true, None::<&str>)?;
@@ -659,7 +655,6 @@ pub fn run() {
             update_service,
             delete_service,
             import_service_icon,
-            duplicate_service,
             get_app_setting,
             set_app_setting,
             start_auto_start_services,
@@ -754,6 +749,7 @@ mod tests {
             max_restart_attempts: Some(5),
             priority: "normal".into(),
             stop_grace_period_ms: 3000,
+            log_max_size_mb: 10,
         })
         .expect("create service");
         let mut database = Database::open(":memory:").expect("open database");
@@ -810,6 +806,7 @@ mod tests {
             max_restart_attempts: Some(5),
             priority: "normal".into(),
             stop_grace_period_ms: 3000,
+            log_max_size_mb: 10,
         })
         .expect("create service");
         let mut database = Database::open(":memory:").expect("open database");
@@ -871,6 +868,7 @@ mod tests {
             max_restart_attempts: Some(5),
             priority: "normal".into(),
             stop_grace_period_ms: 3000,
+            log_max_size_mb: 10,
         })
         .expect("create service");
         let id = service.id.clone();

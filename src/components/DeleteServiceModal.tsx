@@ -19,7 +19,7 @@ export function DeleteServiceModal({
   return (
     <Modal
       titleId="delete-service-title"
-      className="service-dialog delete-dialog"
+      className="delete-dialog"
       onClose={onClose}
     >
       <div className="dialog-heading">

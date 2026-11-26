@@ -15,6 +15,7 @@ export interface ServiceDraft {
   restartPolicy: Service["restartPolicy"];
   restartDelayMs: number;
   stopGracePeriodMs: number;
+  logMaxSizeMb: number;
   enabled: boolean;
   autoStart: boolean;
 }
@@ -126,6 +127,7 @@ export function useServiceManager() {
             restartPolicy: draft.restartPolicy,
             restartDelayMs: draft.restartDelayMs,
             stopGracePeriodMs: draft.stopGracePeriodMs,
+            logMaxSizeMb: draft.logMaxSizeMb,
             enabled: draft.enabled,
             autoStart: draft.autoStart,
           });
@@ -145,6 +147,7 @@ export function useServiceManager() {
             maxRestartAttempts: 5,
             priority: "normal",
             stopGracePeriodMs: draft.stopGracePeriodMs,
+            logMaxSizeMb: draft.logMaxSizeMb,
           };
           await processHub.createService(input);
         }
@@ -158,19 +161,6 @@ export function useServiceManager() {
       }
     },
     [refresh, services],
-  );
-
-  const duplicateService = useCallback(
-    async (service: Service) => {
-      setError(null);
-      try {
-        await processHub.duplicateService(service.id);
-        await refresh();
-      } catch (cause) {
-        setError(String(cause));
-      }
-    },
-    [refresh],
   );
 
   const deleteService = useCallback(
@@ -188,32 +178,6 @@ export function useServiceManager() {
     [refresh],
   );
 
-  const moveService = useCallback(
-    async (service: Service, direction: "first" | "last") => {
-      setBusy(service.id);
-      setError(null);
-      try {
-        const ordered = [...services];
-        const currentIndex = ordered.findIndex(
-          (item) => item.id === service.id,
-        );
-        if (currentIndex < 0) return;
-        ordered.splice(currentIndex, 1);
-        if (direction === "first") ordered.unshift(service);
-        else ordered.push(service);
-        for (const [sortOrder, item] of ordered.entries()) {
-          await processHub.updateService({ ...item, sortOrder });
-        }
-        await refresh();
-      } catch (cause) {
-        setError(String(cause));
-      } finally {
-        setBusy(null);
-      }
-    },
-    [refresh, services],
-  );
-
   return {
     services,
     runtime,
@@ -223,9 +187,7 @@ export function useServiceManager() {
     refresh,
     runAction,
     saveService,
-    duplicateService,
     deleteService,
-    moveService,
     dismissError: () => setError(null),
   };
 }

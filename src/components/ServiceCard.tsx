@@ -10,8 +10,7 @@ interface ServiceCardProps {
   busy: boolean;
   tone: number;
   selected: boolean;
-  onSelect: () => void;
-  onAction: () => void;
+  onOpenDetails: () => void;
   onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
   onKeyboardContextMenu: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
@@ -22,8 +21,7 @@ export function ServiceCard({
   busy,
   tone,
   selected,
-  onSelect,
-  onAction,
+  onOpenDetails,
   onContextMenu,
   onKeyboardContextMenu,
 }: ServiceCardProps) {
@@ -38,16 +36,15 @@ export function ServiceCard({
       onKeyboardContextMenu(event);
     } else if (event.key === "Enter") {
       event.preventDefault();
-      onAction();
+      onOpenDetails();
     }
   }
 
   return (
     <Card
       selected={selected}
-      aria-label={`${service.name}, ${status.replace(/_/g, " ")}. Right-click for actions.`}
-      onClick={onSelect}
-      onDoubleClick={onAction}
+      aria-label={`${service.name}, ${status.replace(/_/g, " ")}. Click for details or right-click for actions.`}
+      onClick={onOpenDetails}
       onContextMenu={onContextMenu}
       onKeyDown={handleKeyDown}
     >

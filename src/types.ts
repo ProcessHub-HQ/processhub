@@ -35,6 +35,7 @@ export interface Service {
   maxRestartAttempts: number | null;
   priority: ProcessPriority;
   stopGracePeriodMs: number;
+  logMaxSizeMb: number;
   createdAt: string;
   updatedAt: string;
   sortOrder: number;
@@ -56,6 +57,7 @@ export type CreateService = Pick<
   | "maxRestartAttempts"
   | "priority"
   | "stopGracePeriodMs"
+  | "logMaxSizeMb"
 >;
 
 export interface RuntimeState {

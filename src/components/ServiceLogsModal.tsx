@@ -1,16 +1,35 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Copy,
+  Pencil,
+  Play,
+  RotateCw,
+  Square,
+  TextSelect,
+  Trash2,
+  X,
+} from "lucide-react";
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { LogEvent, RunHistory, RuntimeState, Service } from "../types";
 import { Button } from "./Button";
+import { useGlobalContextMenu } from "./ContextMenuProvider";
 import { Modal } from "./Modal";
+import { ServiceIcon } from "./ServiceIcon";
 
 interface ServiceLogsModalProps {
   service: Service;
+  tone: number;
+  busy: boolean;
   events: LogEvent[];
   runHistory: RunHistory[];
   droppedEvents: number;
   retentionDays: number;
   state?: RuntimeState;
   onClose: () => void;
+  onStart: () => void;
+  onStop: () => void;
+  onRestart: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
   onClear: () => void;
   onLoad: (serviceId: string) => Promise<void>;
   onRetentionChange: (days: number) => Promise<void>;
@@ -44,12 +63,19 @@ function formatMemory(bytes: number) {
 
 export function ServiceLogsModal({
   service,
+  tone,
+  busy,
   events,
   runHistory,
   droppedEvents,
   retentionDays,
   state,
   onClose,
+  onStart,
+  onStop,
+  onRestart,
+  onEdit,
+  onDelete,
   onClear,
   onLoad,
   onRetentionChange,
@@ -58,21 +84,28 @@ export function ServiceLogsModal({
   const [paused, setPaused] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [pausedEvents, setPausedEvents] = useState<LogEvent[] | null>(null);
-  const [copyError, setCopyError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retentionError, setRetentionError] = useState<string | null>(null);
-  const [selectedEvents, setSelectedEvents] = useState<Set<LogEvent>>(
-    () => new Set(),
-  );
   const streamRef = useRef<HTMLDivElement>(null);
+  const { openContextMenu } = useGlobalContextMenu();
+
   useEffect(() => {
     void onLoad(service.id).catch(() =>
       setLoadError("Saved log history could not be loaded."),
     );
   }, [onLoad, service.id]);
+
+  const status = state?.status ?? "stopped";
+  const active = ["running", "starting", "stopping"].includes(status);
+
   const processMeta = state?.pid
     ? `PID ${state.pid}${state.startedAtMs ? ` · up ${formatUptime(state.startedAtMs)}` : ""}${state.cpuUsagePercent !== null && state.cpuUsagePercent !== undefined ? ` · CPU ${state.cpuUsagePercent.toFixed(1)}%` : ""}${state.memoryUsageBytes !== null && state.memoryUsageBytes !== undefined ? ` · ${formatMemory(state.memoryUsageBytes)}` : ""}`
-    : `${state?.status ?? "stopped"}${state?.exitCode !== null && state?.exitCode !== undefined ? ` · exit ${state.exitCode}` : ""}`;
+    : `${status.replace(/_/g, " ")}${state?.exitCode !== null && state?.exitCode !== undefined ? ` · exit ${state.exitCode}` : ""}`;
+
+  const commandLine = [service.executable, ...service.arguments]
+    .filter(Boolean)
+    .join(" ");
+
   const visibleEvents = paused ? (pausedEvents ?? events) : events;
   const eventKeys = useMemo(
     () =>
@@ -98,57 +131,122 @@ export function ServiceLogsModal({
       streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight });
   });
 
-  async function copyVisible() {
-    try {
-      await navigator.clipboard.writeText(
-        filteredEvents
-          .filter(
-            (event) => selectedEvents.size === 0 || selectedEvents.has(event),
-          )
-          .map(
-            (event) =>
-              `${formatTimestamp(event.timestampMs)} [${event.stream}] ${event.text}`,
-          )
-          .join(""),
-      );
-      setCopyError(null);
-    } catch {
-      setCopyError("Clipboard access is unavailable. Export the logs instead.");
-    }
-  }
-
-  function exportVisible() {
-    const contents = filteredEvents
-      .map(
-        (event) =>
-          `${new Date(event.timestampMs).toISOString()} [${event.stream}] ${event.text}`,
-      )
-      .join("");
-    const url = URL.createObjectURL(
-      new Blob([contents], { type: "text/plain" }),
-    );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${service.name.replace(/[^a-z0-9-_]+/gi, "-")}-logs.txt`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+  function handleStreamContextMenu(event: MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const selectedText = window.getSelection()?.toString() ?? "";
+    const hasLogs = filteredEvents.length > 0;
+    openContextMenu(event, [
+      {
+        id: "logs-copy",
+        label: "Copy",
+        icon: <Copy size={14} />,
+        shortcut: "⌘C",
+        disabled: !selectedText,
+        onSelect: async () => {
+          if (selectedText) {
+            await navigator.clipboard.writeText(selectedText);
+          }
+        },
+      },
+      {
+        id: "logs-select-all",
+        label: "Select all",
+        icon: <TextSelect size={14} />,
+        shortcut: "⌘A",
+        disabled: !hasLogs,
+        onSelect: () => {
+          if (!streamRef.current) return;
+          const selection = window.getSelection();
+          if (!selection) return;
+          const range = document.createRange();
+          range.selectNodeContents(streamRef.current);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        },
+      },
+    ]);
   }
 
   return (
     <Modal
-      titleId="service-logs-title"
-      className="log-dialog"
+      titleId="service-details-title"
+      className="log-dialog details-dialog"
       onClose={onClose}
     >
-      <div className="log-heading">
-        <div>
-          <h2 id="service-logs-title">{service.name} logs</h2>
-          <p title="CPU and memory are estimates for the root process only.">
-            {processMeta} · {visibleEvents.length} buffered events
-          </p>
+      <div className="details-header">
+        <div className="details-title-group">
+          <ServiceIcon service={service} state={state} tone={tone} />
+          <div className="details-title-meta">
+            <div className="details-title-row">
+              <h2 id="service-details-title">{service.name}</h2>
+              <span className={`status-pill ${status}`}>
+                {busy ? "Working…" : status.replace(/_/g, " ")}
+              </span>
+            </div>
+            {service.description && (
+              <p className="details-description">{service.description}</p>
+            )}
+            <p
+              className="details-runtime-meta"
+              title="CPU and memory are estimates for the root process only."
+            >
+              {processMeta} · {visibleEvents.length} buffered events · max{" "}
+              {service.logMaxSizeMb} MB/file
+            </p>
+          </div>
         </div>
-        <Button onClick={onClose}>Done</Button>
+        <Button
+          variant="icon"
+          aria-label="Close details"
+          icon={<X size={17} />}
+          onClick={onClose}
+        />
       </div>
+
+      <div className="details-actions">
+        <Button
+          variant={active ? "secondary" : "primary"}
+          disabled={busy}
+          icon={active ? <Square size={13} /> : <Play size={13} />}
+          onClick={active ? onStop : onStart}
+        >
+          {active ? "Stop" : "Start"}
+        </Button>
+        <Button
+          disabled={busy}
+          icon={<RotateCw size={13} />}
+          onClick={onRestart}
+        >
+          Restart
+        </Button>
+        <span className="details-actions-divider" aria-hidden="true" />
+        <Button icon={<Pencil size={13} />} onClick={onEdit}>
+          Edit
+        </Button>
+        <Button
+          className="details-delete-button"
+          icon={<Trash2 size={13} />}
+          onClick={onDelete}
+        >
+          Delete
+        </Button>
+      </div>
+
+      <div className="details-meta-strip">
+        <div>
+          <span>Command</span>
+          <code title={commandLine}>{commandLine}</code>
+        </div>
+        {service.workingDirectory && (
+          <div>
+            <span>Directory</span>
+            <code title={service.workingDirectory}>
+              {service.workingDirectory}
+            </code>
+          </div>
+        )}
+      </div>
+
       <details className="run-history">
         <summary>Recent runs · {runHistory.length}</summary>
         {runHistory.length === 0 ? (
@@ -174,6 +272,7 @@ export function ServiceLogsModal({
           </ul>
         )}
       </details>
+
       <div className="log-toolbar">
         <input
           type="search"
@@ -194,8 +293,6 @@ export function ServiceLogsModal({
         <Button onClick={() => setAutoScroll((current) => !current)}>
           Follow: {autoScroll ? "On" : "Off"}
         </Button>
-        <Button onClick={() => void copyVisible()}>Copy</Button>
-        <Button onClick={exportVisible}>Export</Button>
         <label className="log-retention">
           Keep
           <select
@@ -216,20 +313,8 @@ export function ServiceLogsModal({
             ))}
           </select>
         </label>
-        <Button
-          onClick={() => {
-            setSelectedEvents(new Set());
-            onClear();
-          }}
-        >
-          Clear view
-        </Button>
+        <Button onClick={onClear}>Clear view</Button>
       </div>
-      {copyError && (
-        <p className="log-copy-error" role="alert">
-          {copyError}
-        </p>
-      )}
       {loadError && (
         <p className="log-copy-error" role="alert">
           {loadError}
@@ -251,6 +336,7 @@ export function ServiceLogsModal({
         ref={streamRef}
         role="log"
         aria-live={paused ? "off" : "polite"}
+        onContextMenu={handleStreamContextMenu}
       >
         {filteredEvents.length === 0 ? (
           <div className="log-empty">
@@ -259,24 +345,11 @@ export function ServiceLogsModal({
               : "No loaded lines match this search."}
           </div>
         ) : (
-          filteredEvents.map((event, index) => (
+          filteredEvents.map((event) => (
             <div
               className={`log-line ${event.stream}`}
               key={eventKeys.get(event)}
             >
-              <input
-                type="checkbox"
-                aria-label={`Select ${event.stream} log line ${index + 1}`}
-                checked={selectedEvents.has(event)}
-                onChange={(inputEvent) =>
-                  setSelectedEvents((current) => {
-                    const next = new Set(current);
-                    if (inputEvent.target.checked) next.add(event);
-                    else next.delete(event);
-                    return next;
-                  })
-                }
-              />
               <time>{formatTimestamp(event.timestampMs)}</time>
               <span className="log-stream-label">{event.stream}</span>
               <pre>{event.text}</pre>

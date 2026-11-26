@@ -39,6 +39,8 @@ pub struct CreateService {
     pub priority: String,
     #[serde(default = "default_stop_grace_period_ms")]
     pub stop_grace_period_ms: u64,
+    #[serde(default = "default_log_max_size_mb")]
+    pub log_max_size_mb: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -62,6 +64,8 @@ pub struct Service {
     pub max_restart_attempts: Option<u32>,
     pub priority: String,
     pub stop_grace_period_ms: u64,
+    #[serde(default = "default_log_max_size_mb")]
+    pub log_max_size_mb: u64,
     pub created_at: String,
     pub updated_at: String,
     pub sort_order: i64,
@@ -88,6 +92,7 @@ impl Service {
             max_restart_attempts: input.max_restart_attempts,
             priority: input.priority,
             stop_grace_period_ms: input.stop_grace_period_ms,
+            log_max_size_mb: input.log_max_size_mb,
             created_at: String::new(),
             updated_at: String::new(),
             sort_order: 0,
@@ -122,6 +127,9 @@ impl Service {
         }
         if !matches!(self.priority.as_str(), "low" | "normal" | "high") {
             return Err("Priority must be low, normal, or high");
+        }
+        if !(1..=1024).contains(&self.log_max_size_mb) {
+            return Err("Max log size must be between 1 and 1024 MB");
         }
         if let Some(directory) = &self.working_directory
             && !std::path::Path::new(directory).is_dir()
@@ -164,6 +172,9 @@ fn default_priority() -> String {
 }
 fn default_stop_grace_period_ms() -> u64 {
     3000
+}
+fn default_log_max_size_mb() -> u64 {
+    10
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -235,6 +246,7 @@ mod tests {
             max_restart_attempts: Some(5),
             priority: "normal".into(),
             stop_grace_period_ms: 3000,
+            log_max_size_mb: 10,
         }
     }
 

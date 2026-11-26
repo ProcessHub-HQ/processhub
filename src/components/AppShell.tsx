@@ -34,6 +34,7 @@ export function AppShell({
           </Button>
           <Button
             variant="icon"
+            data-settings-trigger=""
             className={settingsOpen ? "active" : ""}
             aria-label="Settings"
             aria-expanded={settingsOpen}

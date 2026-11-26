@@ -1,4 +1,4 @@
-import { Boxes, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 
@@ -20,10 +20,10 @@ export function AboutModal({
         onClick={onClose}
         icon={<X size={17} />}
       />
-      <div className="about-logo">
-        <Boxes size={25} strokeWidth={1.8} />
-      </div>
-      <h2 id="about-title">ProcessHub</h2>
+      <img className={"app-brand-image-large"} src={"/icon.svg"} alt={"Logo"} />
+      <h2 id="about-title" style={{ paddingTop: "4px" }}>
+        ProcessHub
+      </h2>
       <p className="about-purpose">
         A local desktop workspace for managing processes and services.
       </p>

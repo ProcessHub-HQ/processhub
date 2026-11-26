@@ -13,11 +13,14 @@
     "windows": [
       {
         "title": "ProcessHub",
-        "width": 1120,
-        "height": 760,
-        "minWidth": 860,
-        "minHeight": 700,
-        "visible": false
+        "width": 800,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 800,
+        "maxWidth": 800,
+        "maxHeight": 800,
+        "resizable": false,
+        "visible": true
       }
     ],
     "security": {

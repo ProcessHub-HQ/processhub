@@ -19,6 +19,7 @@ use tokio::{
     time::timeout,
 };
 
+#[cfg(test)]
 const MAX_LOG_FILE_BYTES: u64 = 10 * 1024 * 1024;
 const ROTATED_LOG_FILES: usize = 3;
 const DEFAULT_LOG_RETENTION_DAYS: u64 = 14;
@@ -343,6 +344,7 @@ impl ProcessManager {
         let log_app = app.clone();
         let log_dir = self.log_dir.clone();
         let log_retention_days = self.log_retention_days.load(Ordering::Relaxed);
+        let max_log_bytes = service.log_max_size_mb.clamp(1, 1024) * 1024 * 1024;
         tokio::spawn(async move {
             if let Some(directory) = log_dir.as_deref()
                 && let Err(error) = cleanup_expired_logs(directory, log_retention_days).await
@@ -351,7 +353,7 @@ impl ProcessManager {
             }
             while let Some(log) = log_rx.recv().await {
                 if let Some(directory) = log_dir.as_deref()
-                    && let Err(error) = persist_log_event(directory, &log).await
+                    && let Err(error) = persist_log_event(directory, &log, max_log_bytes).await
                 {
                     log::warn!(
                         "event=service_log_write_failed service_id={} error={}",
@@ -856,7 +858,11 @@ async fn wait_for_pid_to_exit(pid: u32, duration: Duration) -> bool {
     .is_ok()
 }
 
-async fn persist_log_event(directory: &Path, event: &LogEvent) -> std::io::Result<()> {
+async fn persist_log_event(
+    directory: &Path,
+    event: &LogEvent,
+    max_file_bytes: u64,
+) -> std::io::Result<()> {
     fs::create_dir_all(directory).await?;
     let path = directory.join(format!("{}.log", event.service_id));
     let mut line = serde_json::to_vec(event).map_err(std::io::Error::other)?;
@@ -866,8 +872,7 @@ async fn persist_log_event(directory: &Path, event: &LogEvent) -> std::io::Resul
         .await
         .map(|metadata| metadata.len())
         .unwrap_or(0);
-    if current_size > 0 && current_size.saturating_add(line_bytes.len() as u64) > MAX_LOG_FILE_BYTES
-    {
+    if current_size > 0 && current_size.saturating_add(line_bytes.len() as u64) > max_file_bytes {
         for index in (1..=ROTATED_LOG_FILES).rev() {
             let source = if index == 1 {
                 path.clone()
@@ -1068,6 +1073,7 @@ mod tests {
             max_restart_attempts: Some(1),
             priority: "normal".into(),
             stop_grace_period_ms: 500,
+            log_max_size_mb: 10,
             created_at: String::new(),
             updated_at: String::new(),
             sort_order: 0,
@@ -1149,6 +1155,7 @@ mod tests {
                     timestamp_ms: now_ms(),
                     text: text.clone(),
                 },
+                MAX_LOG_FILE_BYTES,
             )
             .await
             .expect("persist large log event");

@@ -1,33 +1,49 @@
 import { listen } from "@tauri-apps/api/event";
-import { Terminal } from "lucide-react";
+import {
+  FileText,
+  Info,
+  Pencil,
+  Play,
+  Plus,
+  PowerIcon,
+  RotateCw,
+  Settings2,
+  Square,
+  Terminal,
+  Trash2,
+} from "lucide-react";
 import {
   type MouseEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
   useEffect,
   useState,
 } from "react";
 import { AboutModal } from "./components/AboutModal";
 import { AppShell } from "./components/AppShell";
+import {
+  type ContextMenuEntry,
+  ContextMenuProvider,
+  useGlobalContextMenu,
+} from "./components/ContextMenuProvider";
 import { DeleteServiceModal } from "./components/DeleteServiceModal";
 import { ServiceCard } from "./components/ServiceCard";
-import { ServiceContextMenu } from "./components/ServiceContextMenu";
 import { ServiceError } from "./components/ServiceError";
 import { ServiceFormModal } from "./components/ServiceFormModal";
 import { ServiceLogsModal } from "./components/ServiceLogsModal";
 import { ServiceSearch } from "./components/ServiceSearch";
 import { SettingsMenu } from "./components/SettingsMenu";
 import { StartupSettingsModal } from "./components/StartupSettingsModal";
-import { useContextMenu } from "./hooks/useContextMenu";
 import { useServiceLogs } from "./hooks/useServiceLogs";
 import { useServiceManager } from "./hooks/useServiceManager";
 import { processHub } from "./lib/processhub";
 import type { Service } from "./types";
 import "./App.css";
 
-function App() {
+function ProcessHubWorkspace() {
   const manager = useServiceManager();
   const logs = useServiceLogs();
-  const contextMenu = useContextMenu();
+  const { openContextMenu, closeContextMenu } = useGlobalContextMenu();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Service | null>(null);
   const [form, setForm] = useState<{ service?: Service } | null>(null);
@@ -39,6 +55,7 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [logServiceId, setLogServiceId] = useState<string | null>(null);
+
   useEffect(() => {
     const onShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
@@ -46,9 +63,25 @@ function App() {
         setSearchOpen(true);
       }
     };
+    const onNew = () => setForm({});
+    const onStartup = () => setStartupSettingsOpen(true);
+    const onAbout = () => setAboutOpen(true);
+    const onQuit = () => setQuitConfirmationOpen(true);
+
     window.addEventListener("keydown", onShortcut);
-    return () => window.removeEventListener("keydown", onShortcut);
+    window.addEventListener("processhub:new", onNew);
+    window.addEventListener("processhub:startup-settings", onStartup);
+    window.addEventListener("processhub:about", onAbout);
+    window.addEventListener("processhub:quit", onQuit);
+    return () => {
+      window.removeEventListener("keydown", onShortcut);
+      window.removeEventListener("processhub:new", onNew);
+      window.removeEventListener("processhub:startup-settings", onStartup);
+      window.removeEventListener("processhub:about", onAbout);
+      window.removeEventListener("processhub:quit", onQuit);
+    };
   }, []);
+
   useEffect(() => {
     let disposed = false;
     const unlisten = Promise.all([
@@ -107,16 +140,7 @@ function App() {
       });
     };
   }, []);
-  const menuService = contextMenu.menu
-    ? manager.services.find(
-        (service) => service.id === contextMenu.menu?.serviceId,
-      )
-    : undefined;
-  const menuActive = menuService
-    ? ["running", "starting", "stopping"].includes(
-        manager.runtime[menuService.id]?.status ?? "",
-      )
-    : false;
+
   const logService = logServiceId
     ? manager.services.find((service) => service.id === logServiceId)
     : undefined;
@@ -128,16 +152,68 @@ function App() {
   );
 
   function openEditor(service?: Service) {
-    contextMenu.close();
+    closeContextMenu();
     setForm(service ? { service } : {});
+  }
+
+  async function runServiceAction(
+    service: Service,
+    action: "start" | "stop" | "restart",
+  ) {
+    closeContextMenu();
+    await manager.runAction(service, action);
+  }
+
+  function buildServiceMenuItems(service: Service): ContextMenuEntry[] {
+    const active = ["running", "starting", "stopping"].includes(
+      manager.runtime[service.id]?.status ?? "",
+    );
+    return [
+      { type: "heading", id: `heading-${service.id}`, label: service.name },
+      {
+        id: "service-toggle",
+        label: active ? "Stop" : "Start",
+        icon: active ? <Square size={14} /> : <Play size={14} />,
+        shortcut: "↵",
+        onSelect: () => runServiceAction(service, active ? "stop" : "start"),
+      },
+      {
+        id: "service-restart",
+        label: "Restart",
+        icon: <RotateCw size={14} />,
+        onSelect: () => runServiceAction(service, "restart"),
+      },
+      {
+        id: "service-details",
+        label: "View details",
+        icon: <FileText size={14} />,
+        onSelect: () => setLogServiceId(service.id),
+      },
+      { type: "separator", id: "service-sep-1" },
+      {
+        id: "service-edit",
+        label: "Edit details",
+        icon: <Pencil size={14} />,
+        onSelect: () => openEditor(service),
+      },
+      { type: "separator", id: "service-sep-2" },
+      {
+        id: "service-delete",
+        label: "Delete",
+        icon: <Trash2 size={14} />,
+        danger: true,
+        onSelect: () => setPendingDelete(service),
+      },
+    ];
   }
 
   function openServiceMenu(
     event: MouseEvent<HTMLButtonElement>,
     service: Service,
   ) {
+    event.preventDefault();
     setSelectedId(service.id);
-    contextMenu.open(event, service.id);
+    openContextMenu(event, buildServiceMenuItems(service));
   }
 
   function openKeyboardMenu(
@@ -145,23 +221,11 @@ function App() {
     service: Service,
   ) {
     const bounds = event.currentTarget.getBoundingClientRect();
-    contextMenu.open(
-      {
-        preventDefault: () => {},
-        clientX: bounds.left + 18,
-        clientY: bounds.bottom - 10,
-      },
-      service.id,
-    );
     setSelectedId(service.id);
-  }
-
-  async function runServiceAction(
-    service: Service,
-    action: "start" | "stop" | "restart",
-  ) {
-    contextMenu.close();
-    await manager.runAction(service, action);
+    openContextMenu(
+      { clientX: bounds.left + 18, clientY: bounds.bottom - 10 },
+      buildServiceMenuItems(service),
+    );
   }
 
   async function removeService() {
@@ -171,7 +235,7 @@ function App() {
       setSelectedId(null);
       setPendingDelete(null);
     }
-    contextMenu.close();
+    closeContextMenu();
   }
 
   return (
@@ -226,34 +290,29 @@ function App() {
         </div>
       ) : (
         <div className="process-grid">
-          {visibleServices.map((service, index) => {
-            const status = manager.runtime[service.id]?.status ?? "stopped";
-            return (
-              <ServiceCard
-                key={service.id}
-                service={service}
-                state={manager.runtime[service.id]}
-                busy={manager.busy === service.id}
-                tone={index}
-                selected={selectedId === service.id}
-                onSelect={() => setSelectedId(service.id)}
-                onAction={() =>
-                  void runServiceAction(
-                    service,
-                    status === "running" ? "stop" : "start",
-                  )
-                }
-                onContextMenu={(event) => openServiceMenu(event, service)}
-                onKeyboardContextMenu={(event) =>
-                  openKeyboardMenu(event, service)
-                }
-              />
-            );
-          })}
+          {visibleServices.map((service, index) => (
+            <ServiceCard
+              key={service.id}
+              service={service}
+              state={manager.runtime[service.id]}
+              busy={manager.busy === service.id}
+              tone={index}
+              selected={selectedId === service.id}
+              onOpenDetails={() => {
+                setSelectedId(service.id);
+                setLogServiceId(service.id);
+              }}
+              onContextMenu={(event) => openServiceMenu(event, service)}
+              onKeyboardContextMenu={(event) =>
+                openKeyboardMenu(event, service)
+              }
+            />
+          ))}
         </div>
       )}
       {settingsOpen && (
         <SettingsMenu
+          onClose={() => setSettingsOpen(false)}
           onStartupSettings={() => {
             setSettingsOpen(false);
             setStartupSettingsOpen(true);
@@ -314,47 +373,31 @@ function App() {
         </div>
       )}
 
-      {contextMenu.menu && menuService && (
-        <ServiceContextMenu
-          service={menuService}
-          active={menuActive}
-          position={contextMenu.menu}
-          onStart={() => void runServiceAction(menuService, "start")}
-          onStop={() => void runServiceAction(menuService, "stop")}
-          onRestart={() => void runServiceAction(menuService, "restart")}
-          onEdit={() => openEditor(menuService)}
-          onDuplicate={() => {
-            contextMenu.close();
-            void manager.duplicateService(menuService);
-          }}
-          onDelete={() => {
-            contextMenu.close();
-            setPendingDelete(menuService);
-          }}
-          onMoveFirst={() => {
-            contextMenu.close();
-            void manager.moveService(menuService, "first");
-          }}
-          onMoveLast={() => {
-            contextMenu.close();
-            void manager.moveService(menuService, "last");
-          }}
-          onViewLogs={() => {
-            contextMenu.close();
-            setLogServiceId(menuService.id);
-          }}
-        />
-      )}
-
       {logService && (
         <ServiceLogsModal
           service={logService}
+          tone={Math.max(
+            0,
+            manager.services.findIndex((item) => item.id === logService.id),
+          )}
+          busy={manager.busy === logService.id}
           state={manager.runtime[logService.id]}
           events={logs.events[logService.id] ?? []}
           runHistory={logs.runHistory[logService.id] ?? []}
           droppedEvents={logs.dropped[logService.id] ?? 0}
           retentionDays={logs.retentionDays}
           onClose={() => setLogServiceId(null)}
+          onStart={() => void runServiceAction(logService, "start")}
+          onStop={() => void runServiceAction(logService, "stop")}
+          onRestart={() => void runServiceAction(logService, "restart")}
+          onEdit={() => {
+            setLogServiceId(null);
+            openEditor(logService);
+          }}
+          onDelete={() => {
+            setLogServiceId(null);
+            setPendingDelete(logService);
+          }}
           onClear={() => logs.clear(logService.id)}
           onLoad={logs.load}
           onRetentionChange={logs.changeRetention}
@@ -379,6 +422,55 @@ function App() {
         />
       )}
     </AppShell>
+  );
+}
+
+function App() {
+  const getDefaultItems = useCallback(
+    (): ContextMenuEntry[] => [
+      {
+        id: "workspace-new",
+        label: "New process",
+        icon: <Plus size={14} />,
+        onSelect: () => {
+          window.dispatchEvent(new CustomEvent("processhub:new"));
+        },
+      },
+      { type: "separator", id: "workspace-sep-1" },
+      {
+        id: "workspace-startup",
+        label: "Startup settings",
+        icon: <Settings2 size={14} />,
+        onSelect: () => {
+          window.dispatchEvent(new CustomEvent("processhub:startup-settings"));
+        },
+      },
+      {
+        id: "workspace-about",
+        label: "About",
+        icon: <Info size={14} />,
+        onSelect: () => {
+          window.dispatchEvent(new CustomEvent("processhub:about"));
+        },
+      },
+      { type: "separator", id: "workspace-sep-2" },
+      {
+        id: "workspace-quit",
+        label: "Quit",
+        icon: <PowerIcon size={14} />,
+        danger: true,
+        onSelect: () => {
+          window.dispatchEvent(new CustomEvent("processhub:quit"));
+        },
+      },
+    ],
+    [],
+  );
+
+  return (
+    <ContextMenuProvider getDefaultItems={getDefaultItems}>
+      <ProcessHubWorkspace />
+    </ContextMenuProvider>
   );
 }
 
