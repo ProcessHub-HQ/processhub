@@ -1,4 +1,4 @@
-import {Plus, Settings } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "./Button";
 
@@ -20,7 +20,7 @@ export function AppShell({
       <header className="app-bar">
         <div className="app-brand">
           <span className="app-brand-mark">
-          <img className={'app-brand-image'} src={'/icon.svg'}  alt={'Logo'}/>
+            <img className={"app-brand-image"} src={"/icon.svg"} alt={"Logo"} />
           </span>
           <span>ProcessHub</span>
         </div>

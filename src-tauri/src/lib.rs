@@ -533,7 +533,7 @@ pub fn run() {
             // Window starts hidden (visible:false in tauri.conf.json).
             // On macOS, hide the Dock icon until the user opens the window.
             #[cfg(target_os = "macos")]
-            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             let show_item =
                 tauri::menu::MenuItem::with_id(app, "show", "Open ProcessHub", true, None::<&str>)?;
