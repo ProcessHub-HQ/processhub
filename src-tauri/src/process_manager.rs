@@ -240,6 +240,8 @@ impl ProcessManager {
             use std::os::unix::process::CommandExt;
             command.as_std_mut().process_group(0);
         }
+        #[cfg(windows)]
+        configure_windows_no_window(&mut command);
 
         let mut child = match command.spawn() {
             Ok(child) => child,
@@ -1005,16 +1007,28 @@ async fn wait_for_process_tree(pid: u32) {
 }
 
 #[cfg(windows)]
+fn configure_windows_no_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.as_std_mut().creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(windows)]
 async fn wait_for_process_tree(_pid: u32) {}
 
 #[cfg(windows)]
 async fn terminate_tree(pid: u32, force: bool) {
     let mut command = Command::new("taskkill");
     let pid = pid.to_string();
-    command.args(["/PID", pid.as_str(), "/T"]);
+    command
+        .args(["/PID", pid.as_str(), "/T"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     if force {
         command.arg("/F");
     }
+    configure_windows_no_window(&mut command);
     let _ = command.status().await;
 }
 
