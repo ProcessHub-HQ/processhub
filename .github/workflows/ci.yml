@@ -2,41 +2,54 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks:
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10
-      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
         with:
-          components: rustfmt, clippy
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential curl wget file libxdo-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
+          node-version: 22
+          cache: pnpm
+
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm format:check
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: pnpm build
-      - if: runner.os != 'Windows'
-        run: cargo test --manifest-path src-tauri/Cargo.toml
-      - if: runner.os == 'Windows'
-        shell: pwsh
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
         run: |
-          $sep = [char]0x1f
-          $env:CARGO_ENCODED_RUSTFLAGS = @(
-            "-C", "link-arg=/MANIFEST:EMBED",
-            "-C", "link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
-          ) -join $sep
-          cargo test --manifest-path src-tauri/Cargo.toml --lib
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libwebkit2gtk-4.1-dev
+
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --lib
