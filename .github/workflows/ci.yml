@@ -28,5 +28,15 @@ jobs:
       - run: pnpm format:check
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: pnpm build
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - if: runner.os != 'Windows'
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $sep = [char]0x1f
+          $env:CARGO_ENCODED_RUSTFLAGS = @(
+            "-C", "link-arg=/MANIFEST:EMBED",
+            "-C", "link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
+          ) -join $sep
+          cargo test --manifest-path src-tauri/Cargo.toml --lib
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
