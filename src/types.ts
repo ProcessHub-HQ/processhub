@@ -136,6 +136,13 @@ export interface RunHistory {
   error: string | null;
 }
 
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  notes: string | null;
+  date: string | null;
+}
+
 export interface AppSettings {
   theme: "light";
   startAtLogin: boolean;

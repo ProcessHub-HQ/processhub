@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ProcessHub",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "identifier": "com.aakashhq.processhub",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -34,9 +34,18 @@
       }
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/akashpoudelnp/processhub/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNERkQ0MjE5MTQ0Qzk4MEEKUldRS21Fd1VHVUw5UFNUY1BjVnNYZ0Q1QXVWYm45K1JDR2lhNlh0Z1lLQk9pTDFxSml5WFBacG0K"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

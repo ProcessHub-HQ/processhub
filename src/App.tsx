@@ -311,6 +311,21 @@ function ProcessHubWorkspace() {
     }
   }
 
+  async function checkForUpdates() {
+    setSettingsOpen(false);
+    setLifecycleError(null);
+    try {
+      const update = await processHub.checkForUpdate();
+      setNotice(
+        update
+          ? `ProcessHub ${update.version} is available.`
+          : "ProcessHub is up to date.",
+      );
+    } catch (cause) {
+      setLifecycleError(String(cause));
+    }
+  }
+
   async function importConfiguration() {
     setSettingsOpen(false);
     setLifecycleError(null);
@@ -429,6 +444,7 @@ function ProcessHubWorkspace() {
           }}
           onExport={() => void exportConfiguration()}
           onImport={() => void importConfiguration()}
+          onCheckUpdates={() => void checkForUpdates()}
           onAbout={() => {
             setSettingsOpen(false);
             setAboutOpen(true);

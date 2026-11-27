@@ -82,7 +82,29 @@ struct Entry {
     stop: watch::Sender<bool>,
     done: watch::Sender<bool>,
     generation: u64,
+    job: Option<ServiceJob>,
 }
+
+#[cfg(windows)]
+struct ServiceJob(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+unsafe impl Send for ServiceJob {}
+
+#[cfg(windows)]
+unsafe impl Sync for ServiceJob {}
+
+#[cfg(windows)]
+impl Drop for ServiceJob {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+struct ServiceJob;
 
 struct RunOutcome {
     status: String,
@@ -312,6 +334,7 @@ impl ProcessManager {
                     stop,
                     done: watch::channel(false).0,
                     generation,
+                    job: None,
                 },
             );
         }
@@ -458,6 +481,20 @@ impl ProcessManager {
         let pid = child
             .id()
             .ok_or_else(|| "Spawned process has no PID".to_string())?;
+        #[cfg(windows)]
+        let job = match attach_windows_job(&child) {
+            Ok(job) => Some(job),
+            Err(error) => {
+                log::warn!(
+                    "event=job_object_attach_failed service_id={} error={}",
+                    service.id,
+                    error
+                );
+                None
+            }
+        };
+        #[cfg(not(windows))]
+        let job: Option<ServiceJob> = None;
         if let Some(state) = app.try_state::<crate::AppState>() {
             let save_result = match active_process_record(&service.id, pid, &state.session_id).await
             {
@@ -540,6 +577,7 @@ impl ProcessManager {
                     stop,
                     done: done.clone(),
                     generation,
+                    job,
                 },
             );
         }
@@ -904,6 +942,7 @@ impl ProcessManager {
                     stop,
                     done: watch::channel(false).0,
                     generation: 0,
+                    job: None,
                 }
             });
         self.emit_lifecycle_state(&id, app);
@@ -1203,6 +1242,7 @@ impl ProcessManager {
             entry.state.health_latency_ms = None;
             entry.state.health_error = None;
             entry.state.detected_url = None;
+            entry.job.take();
             RunOutcome {
                 status: run_status.into(),
                 restart_delay_ms,
@@ -1984,6 +2024,46 @@ fn configure_windows_no_window(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     command.as_std_mut().creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(windows)]
+fn attach_windows_job(child: &tokio::process::Child) -> Result<ServiceJob, String> {
+    use std::mem::{size_of, zeroed};
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+        SetInformationJobObject,
+    };
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            return Err(std::io::Error::last_os_error().to_string());
+        }
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const core::ffi::c_void,
+            size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        ) == 0
+        {
+            let error = std::io::Error::last_os_error().to_string();
+            CloseHandle(job);
+            return Err(error);
+        }
+        let Some(process) = child.raw_handle() else {
+            CloseHandle(job);
+            return Err("Child process handle is unavailable".into());
+        };
+        if AssignProcessToJobObject(job, process) == 0 {
+            let error = std::io::Error::last_os_error().to_string();
+            CloseHandle(job);
+            return Err(error);
+        }
+        Ok(ServiceJob(job))
+    }
 }
 
 #[cfg(windows)]

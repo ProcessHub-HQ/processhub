@@ -1078,6 +1078,28 @@ fn import_configuration(
     Ok(report)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateInfo {
+    version: String,
+    current_version: String,
+    notes: Option<String>,
+    date: Option<String>,
+}
+
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let update = updater.check().await.map_err(|error| error.to_string())?;
+    Ok(update.map(|update| UpdateInfo {
+        version: update.version,
+        current_version: update.current_version,
+        notes: update.body,
+        date: update.date.map(|date| date.to_string()),
+    }))
+}
+
 #[tauri::command]
 async fn start_service(
     id: String,
@@ -1202,6 +1224,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -1396,6 +1419,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_services,
+            check_for_update,
             set_service_secret,
             delete_service_secret,
             get_service,

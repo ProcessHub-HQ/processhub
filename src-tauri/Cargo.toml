@@ -1,6 +1,6 @@
 [package]
 name = "processhub"
-version = "2.1.0"
+version = "2.2.0"
 description = "Local process and service manager"
 authors = ["Aakash HQ"]
 edition = "2024"
@@ -34,6 +34,10 @@ tauri-plugin-log = "2.10.2"
 sysinfo = "0.40.4"
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
 tauri-plugin-autostart = "2.7.0"
+tauri-plugin-updater = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }

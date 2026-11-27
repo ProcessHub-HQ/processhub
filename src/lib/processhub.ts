@@ -6,9 +6,11 @@ import type {
   RunHistory,
   RuntimeState,
   Service,
+  UpdateInfo,
 } from "../types";
 
 export const processHub = {
+  checkForUpdate: () => invoke<UpdateInfo | null>("check_for_update"),
   listServices: () => invoke<Service[]>("list_services"),
   createService: (input: CreateService) =>
     invoke<Service>("create_service", { input }),
