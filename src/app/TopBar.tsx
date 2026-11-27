@@ -1,5 +1,5 @@
+import { Button } from "@processhub/design-system";
 import { Plus } from "lucide-react";
-import { Button } from "../components/Button";
 import { SettingsMenu } from "../components/SettingsMenu";
 import { useUiStore } from "../stores/uiStore";
 import { useAppCommands } from "./useAppCommands";
@@ -25,6 +25,7 @@ export function TopBar() {
     <header className="app-bar">
       <div className="app-bar-actions">
         <Button
+          size="xs"
           variant="new"
           icon={<Plus size={18} strokeWidth={1.9} />}
           onClick={() => openEditor()}

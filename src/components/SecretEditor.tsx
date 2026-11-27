@@ -1,7 +1,7 @@
+import { Button } from "@processhub/design-system";
 import { Plus, X } from "lucide-react";
 import { newDraftId } from "../lib/ids";
 import type { SecretDraft } from "../types";
-import { Button } from "./Button";
 
 interface SecretEditorProps {
   secrets: SecretDraft[];
@@ -60,6 +60,7 @@ export function SecretEditor({ secrets, onChange }: SecretEditorProps) {
         </div>
       ))}
       <Button
+        size="xs"
         icon={<Plus size={12} />}
         onClick={() =>
           onChange([

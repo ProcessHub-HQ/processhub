@@ -1,7 +1,6 @@
+import { Button, Modal } from "@processhub/design-system";
 import { AboutModal } from "../components/AboutModal";
-import { Button } from "../components/Button";
 import { DeleteServiceModal } from "../components/DeleteServiceModal";
-import { Modal } from "../components/Modal";
 import { ServiceFormModal } from "../components/ServiceFormModal";
 import { ServiceLogsModal } from "../components/ServiceLogsModal";
 import { StartupSettingsModal } from "../components/StartupSettingsModal";
@@ -73,10 +72,11 @@ export function AppDialogs() {
             </p>
           )}
           <div className="dialog-actions">
-            <Button onClick={() => setQuitConfirmationOpen(false)}>
+            <Button size="xs" onClick={() => setQuitConfirmationOpen(false)}>
               Cancel
             </Button>
             <Button
+              size="xs"
               variant="danger"
               onClick={() => {
                 setLifecycleError(null);

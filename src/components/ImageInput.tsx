@@ -39,7 +39,7 @@ export function ImageInput({
   }
 
   return (
-    <div className="field image-field">
+    <div className="ph-field image-field">
       <span>{label}</span>
       <div className="image-input-control">
         <span className="image-input-preview" aria-hidden="true">

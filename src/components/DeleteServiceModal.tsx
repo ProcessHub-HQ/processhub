@@ -1,7 +1,6 @@
+import { Button, Modal } from "@processhub/design-system";
 import { X } from "lucide-react";
 import type { Service } from "../types";
-import { Button } from "./Button";
-import { Modal } from "./Modal";
 
 interface DeleteServiceModalProps {
   service: Service;
@@ -28,6 +27,7 @@ export function DeleteServiceModal({
           <p>“{service.name}” and its saved configuration will be removed.</p>
         </div>
         <Button
+          size="xs"
           variant="icon"
           aria-label="Close"
           icon={<X size={17} />}
@@ -35,10 +35,10 @@ export function DeleteServiceModal({
         />
       </div>
       <div className="dialog-actions">
-        <Button onClick={onClose} disabled={busy}>
+        <Button size="xs" onClick={onClose} disabled={busy}>
           Cancel
         </Button>
-        <Button variant="danger" onClick={onConfirm} disabled={busy}>
+        <Button size="xs" variant="danger" onClick={onConfirm} disabled={busy}>
           {busy ? "Deleting…" : "Delete process"}
         </Button>
       </div>

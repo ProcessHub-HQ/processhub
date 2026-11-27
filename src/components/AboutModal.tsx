@@ -1,6 +1,5 @@
+import { Button, LogoMark, Modal } from "@processhub/design-system";
 import { X } from "lucide-react";
-import { Button } from "./Button";
-import { Modal } from "./Modal";
 
 interface AboutModalProps {
   onClose: () => void;
@@ -14,13 +13,14 @@ export function AboutModal({
   return (
     <Modal titleId="about-title" className="about-dialog" onClose={onClose}>
       <Button
+        size="xs"
         className="about-close"
         variant="icon"
         aria-label="Close About"
         onClick={onClose}
         icon={<X size={17} />}
       />
-      <img className={"app-brand-image-large"} src={"/icon.svg"} alt={"Logo"} />
+      <LogoMark className="app-brand-image-large" />
       <h2 id="about-title" style={{ paddingTop: "4px" }}>
         ProcessHub
       </h2>

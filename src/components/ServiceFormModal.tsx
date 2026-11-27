@@ -1,13 +1,11 @@
+import { Button, Input, Modal, Textarea } from "@processhub/design-system";
 import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { newDraftId } from "../lib/ids";
 import type { ServiceDraft } from "../stores/servicesStore";
 import type { Service } from "../types";
-import { Button } from "./Button";
 import { ImageInput } from "./ImageInput";
-import { Input, Textarea } from "./Input";
-import { Modal } from "./Modal";
 import { SecretEditor } from "./SecretEditor";
 
 interface ServiceFormModalProps {
@@ -100,6 +98,7 @@ export function ServiceFormModal({
             <p>Configure the command ProcessHub will run.</p>
           </div>
           <Button
+            size="xs"
             variant="icon"
             aria-label="Close"
             icon={<X size={17} />}
@@ -144,7 +143,7 @@ export function ServiceFormModal({
                 }
                 placeholder="/path/to/project"
               />
-              <Button onClick={() => void chooseWorkingDirectory()}>
+              <Button size="xs" onClick={() => void chooseWorkingDirectory()}>
                 Browse
               </Button>
             </div>
@@ -447,8 +446,10 @@ export function ServiceFormModal({
           )}
         </div>
         <div className="dialog-actions modal-fixed-footer">
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={busy}>
+          <Button size="xs" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="xs" variant="primary" type="submit" disabled={busy}>
             {busy ? "Saving…" : service ? "Save changes" : "Save process"}
           </Button>
         </div>

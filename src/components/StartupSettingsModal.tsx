@@ -1,7 +1,6 @@
+import { Button, Modal } from "@processhub/design-system";
 import { useEffect, useState } from "react";
 import { processHub } from "../lib/processhub";
-import { Button } from "./Button";
-import { Modal } from "./Modal";
 
 const preferences = [
   {
@@ -89,7 +88,9 @@ export function StartupSettingsModal({ onClose }: StartupSettingsModalProps) {
           <h2 id="startup-settings-title">Startup &amp; tray</h2>
           <p>Choose what ProcessHub does when it opens or closes.</p>
         </div>
-        <Button onClick={onClose}>Done</Button>
+        <Button size="xs" onClick={onClose}>
+          Done
+        </Button>
       </div>
       {preferences.map(({ key, label }) => (
         <label className="startup-setting" key={key}>

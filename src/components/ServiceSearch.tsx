@@ -1,6 +1,6 @@
+import { Button } from "@processhub/design-system";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { Button } from "./Button";
 
 interface ServiceSearchProps {
   value: string;
@@ -31,6 +31,7 @@ export function ServiceSearch({
         }}
       />
       <Button
+        size="xs"
         variant="icon"
         aria-label="Close search"
         icon={<X size={15} />}

@@ -236,7 +236,7 @@ export function ContextMenuProvider({
       }
 
       // If a modal is open and target is inside it without a custom handler, don't show background empty-space menu.
-      if (target?.closest(".dialog-scrim")) {
+      if (target?.closest(".ph-dialog-scrim")) {
         closeContextMenu();
         return;
       }

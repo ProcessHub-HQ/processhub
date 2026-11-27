@@ -1,3 +1,4 @@
+import { Button } from "@processhub/design-system";
 import {
   ArrowUpCircle,
   Download,
@@ -9,7 +10,6 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect } from "react";
-import { Button } from "./Button";
 
 interface SettingsMenuProps {
   open: boolean;
@@ -65,6 +65,7 @@ export function SettingsMenu({
   return (
     <>
       <Button
+        size="xs"
         variant="icon"
         data-settings-trigger=""
         className={open ? "active" : ""}

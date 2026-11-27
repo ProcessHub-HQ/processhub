@@ -1,3 +1,4 @@
+import { Button, Modal } from "@processhub/design-system";
 import {
   AlertCircle,
   CheckCircle2,
@@ -7,8 +8,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useUiStore } from "../stores/uiStore";
-import { Button } from "./Button";
-import { Modal } from "./Modal";
 
 const LINK_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
 
@@ -112,6 +111,7 @@ export function UpdateDialog() {
         ProcessHub update
       </h2>
       <Button
+        size="xs"
         className="update-close"
         variant="icon"
         aria-label="Close update dialog"
@@ -181,6 +181,7 @@ export function UpdateDialog() {
       <div className="dialog-actions update-footer">
         {phase === "available" && (
           <Button
+            size="xs"
             variant="primary"
             icon={<Download size={13} />}
             onClick={() => void install()}
@@ -190,6 +191,7 @@ export function UpdateDialog() {
         )}
         {phase === "error" && (
           <Button
+            size="xs"
             variant="primary"
             icon={<RefreshCw size={13} />}
             onClick={() => void check()}

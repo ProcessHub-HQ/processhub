@@ -1,3 +1,9 @@
+import {
+  Badge,
+  type BadgeVariant,
+  Button,
+  Modal,
+} from "@processhub/design-system";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Copy,
@@ -19,11 +25,36 @@ import {
   useState,
 } from "react";
 import { parseAnsi } from "../lib/ansi";
-import type { LogEvent, RunHistory, RuntimeState, Service } from "../types";
-import { Button } from "./Button";
+import type {
+  HealthStatus,
+  LogEvent,
+  RunHistory,
+  RuntimeState,
+  RuntimeStatus,
+  Service,
+} from "../types";
 import { useGlobalContextMenu } from "./ContextMenuProvider";
-import { Modal } from "./Modal";
 import { ServiceIcon } from "./ServiceIcon";
+
+function statusBadgeVariant(status: RuntimeStatus): BadgeVariant {
+  if (status === "running") return "success";
+  if (status === "failed") return "danger";
+  if (
+    status === "starting" ||
+    status === "stopping" ||
+    status === "waiting_to_restart"
+  ) {
+    return "warning";
+  }
+  return "neutral";
+}
+
+function healthBadgeVariant(health: HealthStatus): BadgeVariant {
+  if (health === "healthy") return "success";
+  if (health === "unhealthy") return "danger";
+  if (health === "starting") return "warning";
+  return "neutral";
+}
 
 interface ServiceLogsModalProps {
   service: Service;
@@ -242,16 +273,17 @@ export function ServiceLogsModal({
           <div className="details-title-meta">
             <div className="details-title-row">
               <h2 id="service-details-title">{service.name}</h2>
-              <span className={`status-pill ${status}`}>
+              <Badge size="sm" variant={statusBadgeVariant(status)}>
                 {busy ? "Working…" : status.replace(/_/g, " ")}
-              </span>
+              </Badge>
               {state && state.health !== "not_configured" && (
-                <span
-                  className={`health-pill ${state.health}`}
+                <Badge
+                  size="sm"
+                  variant={healthBadgeVariant(state.health)}
                   title={state.healthError ?? "Health check"}
                 >
                   {state.health}
-                </span>
+                </Badge>
               )}
             </div>
             {service.description && (
@@ -269,6 +301,7 @@ export function ServiceLogsModal({
           </div>
         </div>
         <Button
+          size="xs"
           variant="icon"
           aria-label="Close details"
           icon={<X size={17} />}
@@ -278,6 +311,7 @@ export function ServiceLogsModal({
 
       <div className="details-actions">
         <Button
+          size="xs"
           variant={active ? "secondary" : "primary"}
           disabled={busy}
           icon={active ? <Square size={13} /> : <Play size={13} />}
@@ -286,6 +320,7 @@ export function ServiceLogsModal({
           {active ? "Stop" : "Start"}
         </Button>
         <Button
+          size="xs"
           disabled={busy}
           icon={<RotateCw size={13} />}
           onClick={onRestart}
@@ -293,15 +328,20 @@ export function ServiceLogsModal({
           Restart
         </Button>
         {state?.detectedUrl && (
-          <Button icon={<ExternalLink size={13} />} onClick={openDetectedUrl}>
+          <Button
+            size="xs"
+            icon={<ExternalLink size={13} />}
+            onClick={openDetectedUrl}
+          >
             Open
           </Button>
         )}
         <span className="details-actions-divider" aria-hidden="true" />
-        <Button icon={<Pencil size={13} />} onClick={onEdit}>
+        <Button size="xs" icon={<Pencil size={13} />} onClick={onEdit}>
           Edit
         </Button>
         <Button
+          size="xs"
           className="details-delete-button"
           icon={<Trash2 size={13} />}
           onClick={onDelete}
@@ -351,6 +391,7 @@ export function ServiceLogsModal({
           onChange={(event) => setQuery(event.target.value)}
         />
         <Button
+          size="xs"
           onClick={() => {
             if (!paused) setPausedEvents(events);
             else setPausedEvents(null);
@@ -359,7 +400,7 @@ export function ServiceLogsModal({
         >
           {paused ? "Resume" : "Pause"}
         </Button>
-        <Button onClick={() => setAutoScroll((current) => !current)}>
+        <Button size="xs" onClick={() => setAutoScroll((current) => !current)}>
           Follow: {autoScroll ? "On" : "Off"}
         </Button>
         <label className="log-retention">
@@ -382,7 +423,9 @@ export function ServiceLogsModal({
             ))}
           </select>
         </label>
-        <Button onClick={onClear}>Clear view</Button>
+        <Button size="xs" onClick={onClear}>
+          Clear view
+        </Button>
       </div>
       {loadError && (
         <p className="log-copy-error" role="alert">
