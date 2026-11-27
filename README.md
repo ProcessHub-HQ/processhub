@@ -8,8 +8,8 @@
   </p>
 
   <p>
-    <a href="https://github.com/akashpoudelnp/processhub/actions/workflows/ci.yml">
-      <img src="https://github.com/akashpoudelnp/processhub/actions/workflows/ci.yml/badge.svg" alt="CI" />
+    <a href="https://github.com/ProcessHub-HQ/processhub/actions/workflows/ci.yml">
+      <img src="https://github.com/ProcessHub-HQ/processhub/actions/workflows/ci.yml/badge.svg" alt="CI" />
     </a>
     <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2" />
     <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19" />
@@ -76,7 +76,7 @@ See [PLAN.md](PLAN.md) for the full engineering roadmap and phase status.
 ### Run Locally
 
 ```sh
-git clone https://github.com/akashpoudelnp/processhub.git
+git clone https://github.com/ProcessHub-HQ/processhub.git
 cd processhub
 pnpm install
 pnpm tauri dev

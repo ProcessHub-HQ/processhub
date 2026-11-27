@@ -39,7 +39,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/akashpoudelnp/processhub/releases/latest/download/latest.json"
+        "https://github.com/ProcessHub-HQ/processhub/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNERkQ0MjE5MTQ0Qzk4MEEKUldRS21Fd1VHVUw5UFNUY1BjVnNYZ0Q1QXVWYm45K1JDR2lhNlh0Z1lLQk9pTDFxSml5WFBacG0K"
     }
