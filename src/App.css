@@ -164,6 +164,115 @@ textarea:focus-visible {
   padding: 22px 26px 28px;
 }
 
+.workspace::before,
+.workspace::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  width: 240px;
+  height: 180px;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(132, 144, 163, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(132, 144, 163, 0.06) 1px, transparent 1px),
+    conic-gradient(
+      from 90deg at 1px 1px,
+      transparent 90deg,
+      rgba(88, 137, 227, 0.025) 0 180deg,
+      transparent 0 270deg,
+      rgba(88, 137, 227, 0.025) 0
+    );
+  background-size:
+    16px 16px,
+    16px 16px,
+    32px 32px;
+}
+
+.workspace::before {
+  top: 54px;
+  left: 0;
+  -webkit-mask-image: radial-gradient(
+    ellipse at 0% 0%,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 40%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(
+    ellipse at 0% 0%,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 40%,
+    transparent 70%
+  );
+}
+
+.workspace::after {
+  right: 0;
+  bottom: 0;
+  -webkit-mask-image: radial-gradient(
+    ellipse at 100% 100%,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 40%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(
+    ellipse at 100% 100%,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 40%,
+    transparent 70%
+  );
+}
+
+.process-grid,
+.empty-canvas,
+.canvas-message {
+  position: relative;
+  z-index: 1;
+}
+
+.workspace::after {
+  content: "";
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 280px;
+  height: 210px;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(132, 144, 163, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(132, 144, 163, 0.14) 1px, transparent 1px),
+    conic-gradient(
+      from 90deg at 1px 1px,
+      transparent 90deg,
+      rgba(88, 137, 227, 0.05) 0 180deg,
+      transparent 0 270deg,
+      rgba(88, 137, 227, 0.05) 0
+    );
+  background-size:
+    16px 16px,
+    16px 16px,
+    32px 32px;
+  -webkit-mask-image: radial-gradient(
+    ellipse at 100% 100%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 76%
+  );
+  mask-image: radial-gradient(
+    ellipse at 100% 100%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 76%
+  );
+}
+
+.process-grid,
+.empty-canvas,
+.canvas-message {
+  position: relative;
+  z-index: 1;
+}
+
 .service-search {
   position: absolute;
   top: 12px;
@@ -599,6 +708,34 @@ textarea:focus-visible {
   line-height: 1.5;
 }
 
+.notice-banner {
+  position: fixed;
+  bottom: 19px;
+  left: 20px;
+  z-index: 12;
+  display: flex;
+  max-width: min(420px, calc(100vw - 40px));
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid #bfe4d1;
+  border-radius: 7px;
+  color: #1f6b3a;
+  background: #ebf7f0;
+  box-shadow: var(--shadow);
+  font-size: 10px;
+}
+
+.notice-banner button {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
 .error-banner {
   position: fixed;
   right: 20px;
@@ -710,6 +847,68 @@ textarea:focus-visible {
   box-shadow: 0 18px 55px rgba(18, 29, 46, 0.2);
 }
 
+.dependency-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.dependency-list-label {
+  color: #4d5865;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.dependency-options {
+  display: grid;
+  max-height: 120px;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  overflow: auto;
+}
+
+.dependency-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #4d5865;
+  font-size: 10px;
+}
+
+.secret-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.secret-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.secret-row input {
+  height: 33px;
+  min-width: 0;
+  flex: 1;
+  padding: 0 9px;
+  border: 1px solid #dce1e8;
+  border-radius: 5px;
+  color: #303a46;
+  background: var(--surface);
+  font-size: 11px;
+}
+
+.secret-row input:first-child {
+  flex: 0 0 38%;
+}
+
+.secret-editor > .cancel-button {
+  align-self: flex-start;
+}
+
 .details-header {
   display: flex;
   align-items: flex-start;
@@ -778,10 +977,48 @@ textarea:focus-visible {
 }
 
 .status-pill.starting,
-.status-pill.stopping {
+.status-pill.stopping,
+.status-pill.waiting_to_restart {
   border-color: #efd9b0;
   color: #9e6d21;
   background: #fdf6e9;
+}
+
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid #dce2ea;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #f5f7fa;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.health-pill.healthy {
+  border-color: #bfe4d1;
+  color: var(--green);
+  background: #ebf7f0;
+}
+
+.health-pill.unhealthy {
+  border-color: #f0c9c9;
+  color: var(--red);
+  background: #fdf1f1;
+}
+
+.health-pill.starting {
+  border-color: #efd9b0;
+  color: #9e6d21;
+  background: #fdf6e9;
+}
+
+.details-health-error {
+  margin: 3px 0 0;
+  color: var(--red);
+  font-size: 10px;
 }
 
 .details-description {
@@ -964,6 +1201,8 @@ textarea:focus-visible {
   padding: 4px 10px;
   border-bottom: 1px solid rgba(222, 227, 234, 0.7);
   color: #4d5865;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 24px;
   font:
     10px / 1.5 ui-monospace,
     SFMono-Regular,
@@ -1004,6 +1243,10 @@ textarea:focus-visible {
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 20px;
+}
+
+.dialog-heading.modal-fixed-header {
+  margin-bottom: 0;
 }
 
 .dialog-heading h2 {
@@ -1052,6 +1295,86 @@ textarea:focus-visible {
   font-weight: 400;
 }
 
+.field input,
+.field select,
+.form-options select {
+  height: 33px;
+}
+
+.image-field {
+  min-width: 0;
+}
+
+.image-input-control {
+  display: flex;
+  height: 33px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  border: 1px solid #dce1e8;
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+.image-input-preview {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 4px;
+  color: #929ba6;
+  background: #f2f5f9;
+}
+
+.image-input-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-input-status {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: #7a8492;
+  font-size: 9px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-input-button {
+  display: inline-flex;
+  height: 23px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid #dce1e8;
+  border-radius: 4px;
+  color: #4d5865;
+  background: #f8f9fb;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.image-input-button:hover:not(:disabled) {
+  background: #eef2f8;
+}
+
+.image-input-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.image-input-button.remove {
+  padding: 0 5px;
+  color: #9a4a4a;
+}
+
 .field select,
 .form-options select {
   width: 100%;
@@ -1098,7 +1421,11 @@ textarea:focus-visible {
 
 .cancel-button,
 .save-button {
+  display: inline-flex;
   min-height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 12px;
   border: 1px solid #dce1e8;
   border-radius: 5px;
@@ -1116,7 +1443,11 @@ textarea:focus-visible {
 }
 
 .danger-button {
+  display: inline-flex;
   min-height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 12px;
   border: 1px solid #b94747;
   border-radius: 5px;
@@ -1131,15 +1462,6 @@ textarea:focus-visible {
 .danger-button:disabled {
   opacity: 0.55;
   cursor: default;
-}
-
-.form-icon-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 10px;
 }
 
 .path-picker-row {
@@ -1180,6 +1502,10 @@ textarea:focus-visible {
   color: #4d5865;
   font-size: 10px;
   font-weight: 600;
+}
+
+.form-options > .field {
+  margin-top: 0;
 }
 
 .form-toggles {

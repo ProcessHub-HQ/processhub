@@ -2,14 +2,17 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import type { ServiceDraft } from "../hooks/useServiceManager";
-import { processHub } from "../lib/processhub";
+import { newDraftId } from "../lib/ids";
 import type { Service } from "../types";
 import { Button } from "./Button";
+import { ImageInput } from "./ImageInput";
 import { Input, Textarea } from "./Input";
 import { Modal } from "./Modal";
+import { SecretEditor } from "./SecretEditor";
 
 interface ServiceFormModalProps {
   service?: Service;
+  services: Service[];
   busy: boolean;
   onClose: () => void;
   onSave: (draft: ServiceDraft) => Promise<boolean>;
@@ -17,6 +20,7 @@ interface ServiceFormModalProps {
 
 export function ServiceFormModal({
   service,
+  services,
   busy,
   onClose,
   onSave,
@@ -26,39 +30,42 @@ export function ServiceFormModal({
     name: service?.name ?? "",
     description: service?.description ?? "",
     iconPath: service?.iconPath ?? null,
+    dependsOn: service?.dependsOn ?? [],
     executable: service?.executable ?? "",
     argumentsText: service?.arguments.join("\n") ?? "",
     workingDirectory: service?.workingDirectory ?? "",
     environmentText:
       service?.environment
+        .filter((variable) => !variable.isSecret)
         .map(({ key, value }) => `${key}=${value}`)
         .join("\n") ?? "",
+    secrets:
+      service?.environment
+        .filter((variable) => variable.isSecret)
+        .map(({ key }) => ({
+          id: newDraftId("secret"),
+          key,
+          value: "",
+          existing: true,
+        })) ?? [],
     restartPolicy: service?.restartPolicy ?? "never",
     restartDelayMs: service?.restartDelayMs ?? 1000,
+    maxRestartAttempts: service?.maxRestartAttempts ?? 5,
     stopGracePeriodMs: service?.stopGracePeriodMs ?? 3000,
     logMaxSizeMb: service?.logMaxSizeMb ?? 10,
+    healthCheckType: service?.healthCheckType ?? "none",
+    healthTarget: service?.healthTarget ?? "",
+    healthIntervalMs: service?.healthIntervalMs ?? 5000,
+    healthTimeoutMs: service?.healthTimeoutMs ?? 2000,
+    healthExpectedStatus: service?.healthExpectedStatus ?? null,
+    healthStartPeriodMs: service?.healthStartPeriodMs ?? 5000,
     enabled: service?.enabled ?? true,
     autoStart: service?.autoStart ?? false,
   }));
   const [formError, setFormError] = useState<string | null>(null);
-
-  async function chooseIcon() {
-    try {
-      const selected = await open({
-        multiple: false,
-        filters: [
-          { name: "Image", extensions: ["png", "jpg", "jpeg", "webp"] },
-        ],
-      });
-      if (typeof selected === "string") {
-        const iconPath = await processHub.importServiceIcon(selected);
-        setDraft((current) => ({ ...current, iconPath }));
-        setFormError(null);
-      }
-    } catch (cause) {
-      setFormError(String(cause));
-    }
-  }
+  const dependencyOptions = services.filter(
+    (item) => item.id !== (draft.id ?? service?.id),
+  );
 
   async function chooseWorkingDirectory() {
     try {
@@ -100,15 +107,13 @@ export function ServiceFormModal({
           />
         </div>
         <div className="service-form-body">
-          <div className="form-icon-row">
-            <span>
-              {draft.iconPath
-                ? "Custom icon selected"
-                : "Use a custom process icon"}
-            </span>
-            <Button onClick={() => void chooseIcon()}>Choose icon</Button>
-          </div>
           <div className="service-form-grid">
+            <ImageInput
+              label="Icon"
+              value={draft.iconPath}
+              onChange={(iconPath) => setDraft({ ...draft, iconPath })}
+              onError={setFormError}
+            />
             <Input
               label="Name"
               autoFocus
@@ -119,15 +124,6 @@ export function ServiceFormModal({
                 setDraft({ ...draft, name: event.target.value })
               }
               placeholder="Local API"
-            />
-            <Input
-              label="Description"
-              maxLength={500}
-              value={draft.description}
-              onChange={(event) =>
-                setDraft({ ...draft, description: event.target.value })
-              }
-              placeholder="What this process does"
             />
             <Input
               label="Executable"
@@ -166,6 +162,17 @@ export function ServiceFormModal({
           <div className="advanced-fields">
             <h3 className="form-section-title">Environment &amp; behavior</h3>
             <Textarea
+              label="Description"
+              hint="Optional"
+              rows={2}
+              maxLength={500}
+              value={draft.description}
+              onChange={(event) =>
+                setDraft({ ...draft, description: event.target.value })
+              }
+              placeholder="What this process does"
+            />
+            <Textarea
               label="Environment variables"
               hint="One KEY=VALUE per line"
               rows={3}
@@ -174,6 +181,10 @@ export function ServiceFormModal({
                 setDraft({ ...draft, environmentText: event.target.value })
               }
               placeholder={"NODE_ENV=development\nPORT=3000"}
+            />
+            <SecretEditor
+              secrets={draft.secrets}
+              onChange={(secrets) => setDraft({ ...draft, secrets })}
             />
             <div className="form-options">
               <label>
@@ -189,7 +200,6 @@ export function ServiceFormModal({
                 Restart policy
                 <select
                   value={draft.restartPolicy}
-                  disabled
                   onChange={(event) =>
                     setDraft({
                       ...draft,
@@ -205,14 +215,30 @@ export function ServiceFormModal({
               </label>
               <Input
                 label="Restart delay (ms)"
+                hint="Backs off up to 30 s"
                 type="number"
                 min={0}
-                disabled
                 value={draft.restartDelayMs}
                 onChange={(event) =>
                   setDraft({
                     ...draft,
                     restartDelayMs: Number(event.target.value),
+                  })
+                }
+              />
+              <Input
+                label="Max restart attempts"
+                hint="Blank means unlimited"
+                type="number"
+                min={1}
+                value={draft.maxRestartAttempts ?? ""}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    maxRestartAttempts:
+                      event.target.value === ""
+                        ? null
+                        : Math.max(1, Math.floor(Number(event.target.value))),
                   })
                 }
               />
@@ -280,6 +306,138 @@ export function ServiceFormModal({
                   .map((part) => JSON.stringify(part))
                   .join(" ") || "Enter an executable"}
               </code>
+            </div>
+          </div>
+          <div className="advanced-fields">
+            <h3 className="form-section-title">Startup order</h3>
+            {dependencyOptions.length > 0 && (
+              <div className="dependency-list">
+                <span className="dependency-list-label">Start after</span>
+                <div className="dependency-options">
+                  {dependencyOptions.map((item) => (
+                    <label key={item.id} className="dependency-option">
+                      <input
+                        type="checkbox"
+                        checked={draft.dependsOn.includes(item.id)}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            dependsOn: event.target.checked
+                              ? [...draft.dependsOn, item.id]
+                              : draft.dependsOn.filter((id) => id !== item.id),
+                          })
+                        }
+                      />
+                      {item.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="advanced-fields">
+            <h3 className="form-section-title">Health check</h3>
+            <div className="form-options">
+              <label>
+                Check
+                <select
+                  value={draft.healthCheckType}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      healthCheckType: event.target
+                        .value as ServiceDraft["healthCheckType"],
+                    })
+                  }
+                >
+                  <option value="none">Not configured</option>
+                  <option value="tcp">TCP port</option>
+                  <option value="http">HTTP URL</option>
+                </select>
+              </label>
+              {draft.healthCheckType !== "none" && (
+                <Input
+                  label={draft.healthCheckType === "http" ? "URL" : "Target"}
+                  hint={
+                    draft.healthCheckType === "http"
+                      ? "http://host:port/path"
+                      : "Port or host:port"
+                  }
+                  value={draft.healthTarget}
+                  onChange={(event) =>
+                    setDraft({ ...draft, healthTarget: event.target.value })
+                  }
+                  placeholder={
+                    draft.healthCheckType === "http"
+                      ? "http://localhost:3000/health"
+                      : "3000"
+                  }
+                />
+              )}
+              {draft.healthCheckType !== "none" && (
+                <Input
+                  label="Check interval (ms)"
+                  type="number"
+                  min={500}
+                  max={300000}
+                  value={draft.healthIntervalMs}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      healthIntervalMs: Number(event.target.value),
+                    })
+                  }
+                />
+              )}
+              {draft.healthCheckType !== "none" && (
+                <Input
+                  label="Check timeout (ms)"
+                  type="number"
+                  min={100}
+                  max={60000}
+                  value={draft.healthTimeoutMs}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      healthTimeoutMs: Number(event.target.value),
+                    })
+                  }
+                />
+              )}
+              {draft.healthCheckType !== "none" && (
+                <Input
+                  label="Start period (ms)"
+                  type="number"
+                  min={0}
+                  max={600000}
+                  value={draft.healthStartPeriodMs}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      healthStartPeriodMs: Number(event.target.value),
+                    })
+                  }
+                />
+              )}
+              {draft.healthCheckType === "http" && (
+                <Input
+                  label="Expected status"
+                  hint="Blank accepts 2xx–3xx"
+                  type="number"
+                  min={100}
+                  max={599}
+                  value={draft.healthExpectedStatus ?? ""}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      healthExpectedStatus:
+                        event.target.value === ""
+                          ? null
+                          : Number(event.target.value),
+                    })
+                  }
+                />
+              )}
             </div>
           </div>
           {formError && (

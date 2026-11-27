@@ -1,6 +1,12 @@
 export type ExecutionMode = "direct" | "shell";
 export type RestartPolicy = "never" | "on_failure" | "always";
 export type ProcessPriority = "low" | "normal" | "high";
+export type HealthCheckType = "none" | "tcp" | "http";
+export type HealthStatus =
+  | "not_configured"
+  | "starting"
+  | "healthy"
+  | "unhealthy";
 export type RuntimeStatus =
   | "stopped"
   | "starting"
@@ -15,6 +21,13 @@ export interface EnvironmentVariable {
   key: string;
   value: string;
   isSecret: boolean;
+}
+
+export interface SecretDraft {
+  id: string;
+  key: string;
+  value: string;
+  existing: boolean;
 }
 
 export interface Service {
@@ -36,9 +49,26 @@ export interface Service {
   priority: ProcessPriority;
   stopGracePeriodMs: number;
   logMaxSizeMb: number;
+  healthCheckType: HealthCheckType;
+  healthTarget: string | null;
+  healthIntervalMs: number;
+  healthTimeoutMs: number;
+  healthExpectedStatus: number | null;
+  healthStartPeriodMs: number;
+  dependsOn: string[];
   createdAt: string;
   updatedAt: string;
   sortOrder: number;
+}
+
+export interface ImportReport {
+  importedServices: number;
+  droppedSecrets: number;
+  renamedServices: number;
+  droppedDependencies: number;
+  droppedIcons: number;
+  sanitizedDirectories: number;
+  importedSettings: number;
 }
 
 export type CreateService = Pick<
@@ -52,12 +82,19 @@ export type CreateService = Pick<
   | "description"
   | "enabled"
   | "autoStart"
+  | "dependsOn"
   | "restartPolicy"
   | "restartDelayMs"
   | "maxRestartAttempts"
   | "priority"
   | "stopGracePeriodMs"
   | "logMaxSizeMb"
+  | "healthCheckType"
+  | "healthTarget"
+  | "healthIntervalMs"
+  | "healthTimeoutMs"
+  | "healthExpectedStatus"
+  | "healthStartPeriodMs"
 >;
 
 export interface RuntimeState {
@@ -69,6 +106,13 @@ export interface RuntimeState {
   cpuUsagePercent: number | null;
   memoryUsageBytes: number | null;
   metricsSampledAtMs: number | null;
+  health: HealthStatus;
+  healthCheckedAtMs: number | null;
+  healthLatencyMs: number | null;
+  healthError: string | null;
+  detectedUrl: string | null;
+  restartAtMs: number | null;
+  restartAttempt: number | null;
   error: string | null;
 }
 

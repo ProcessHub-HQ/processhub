@@ -1,4 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   FileText,
   Info,
@@ -11,6 +13,7 @@ import {
   Square,
   Terminal,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   type MouseEvent,
@@ -52,9 +55,42 @@ function ProcessHubWorkspace() {
   const [startupSettingsOpen, setStartupSettingsOpen] = useState(false);
   const [quitConfirmationOpen, setQuitConfirmationOpen] = useState(false);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [logServiceId, setLogServiceId] = useState<string | null>(null);
+  const refreshServices = manager.refresh;
+
+  const runGlobalAction = useCallback(
+    async (action: "start" | "stop" | "restart") => {
+      closeContextMenu();
+      setLifecycleError(null);
+      try {
+        if (action === "stop") {
+          const failures = await processHub.stopAllServices();
+          if (failures.length > 0) {
+            setLifecycleError(
+              `Some services could not be stopped: ${failures.join("; ")}`,
+            );
+          }
+        } else {
+          const report =
+            action === "start"
+              ? await processHub.startAllServices()
+              : await processHub.restartAllServices();
+          if (report.failures.length > 0) {
+            setLifecycleError(
+              `Started ${report.started.length} service(s); ${report.failures.length} failed: ${report.failures.join("; ")}`,
+            );
+          }
+        }
+        await refreshServices();
+      } catch (cause) {
+        setLifecycleError(String(cause));
+      }
+    },
+    [closeContextMenu, refreshServices],
+  );
 
   useEffect(() => {
     const onShortcut = (event: KeyboardEvent) => {
@@ -67,20 +103,29 @@ function ProcessHubWorkspace() {
     const onStartup = () => setStartupSettingsOpen(true);
     const onAbout = () => setAboutOpen(true);
     const onQuit = () => setQuitConfirmationOpen(true);
+    const onStartAll = () => void runGlobalAction("start");
+    const onStopAll = () => void runGlobalAction("stop");
+    const onRestartAll = () => void runGlobalAction("restart");
 
     window.addEventListener("keydown", onShortcut);
     window.addEventListener("processhub:new", onNew);
     window.addEventListener("processhub:startup-settings", onStartup);
     window.addEventListener("processhub:about", onAbout);
     window.addEventListener("processhub:quit", onQuit);
+    window.addEventListener("processhub:start-all", onStartAll);
+    window.addEventListener("processhub:stop-all", onStopAll);
+    window.addEventListener("processhub:restart-all", onRestartAll);
     return () => {
       window.removeEventListener("keydown", onShortcut);
       window.removeEventListener("processhub:new", onNew);
       window.removeEventListener("processhub:startup-settings", onStartup);
       window.removeEventListener("processhub:about", onAbout);
       window.removeEventListener("processhub:quit", onQuit);
+      window.removeEventListener("processhub:start-all", onStartAll);
+      window.removeEventListener("processhub:stop-all", onStopAll);
+      window.removeEventListener("processhub:restart-all", onRestartAll);
     };
-  }, []);
+  }, [runGlobalAction]);
 
   useEffect(() => {
     let disposed = false;
@@ -96,6 +141,15 @@ function ProcessHubWorkspace() {
         },
       ),
       listen("quit-confirmation-required", () => setQuitConfirmationOpen(true)),
+      listen<string>("open-service-details", ({ payload }) => {
+        setSelectedId(payload);
+        setLogServiceId(payload);
+      }),
+      listen<string>("tray-open-url", ({ payload }) => {
+        void openUrl(payload).catch((cause: unknown) =>
+          setLifecycleError(String(cause)),
+        );
+      }),
       listen<{ action: string; failures: string[] }>(
         "tray-action-report",
         ({ payload }) => {
@@ -165,9 +219,12 @@ function ProcessHubWorkspace() {
   }
 
   function buildServiceMenuItems(service: Service): ContextMenuEntry[] {
-    const active = ["running", "starting", "stopping"].includes(
-      manager.runtime[service.id]?.status ?? "",
-    );
+    const active = [
+      "running",
+      "starting",
+      "stopping",
+      "waiting_to_restart",
+    ].includes(manager.runtime[service.id]?.status ?? "");
     return [
       { type: "heading", id: `heading-${service.id}`, label: service.name },
       {
@@ -238,6 +295,47 @@ function ProcessHubWorkspace() {
     closeContextMenu();
   }
 
+  async function exportConfiguration() {
+    setSettingsOpen(false);
+    setLifecycleError(null);
+    try {
+      const path = await save({
+        defaultPath: "processhub-config.json",
+        filters: [{ name: "ProcessHub configuration", extensions: ["json"] }],
+      });
+      if (typeof path !== "string") return;
+      await processHub.exportConfigurationTo(path);
+      setNotice("Configuration exported.");
+    } catch (cause) {
+      setLifecycleError(String(cause));
+    }
+  }
+
+  async function importConfiguration() {
+    setSettingsOpen(false);
+    setLifecycleError(null);
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: "ProcessHub configuration", extensions: ["json"] }],
+      });
+      if (typeof path !== "string") return;
+      const report = await processHub.importConfigurationFrom(path);
+      await manager.refresh();
+      const details = [];
+      if (report.renamedServices) {
+        details.push(`${report.renamedServices} renamed to avoid duplicates`);
+      }
+      if (report.droppedSecrets) {
+        details.push(`${report.droppedSecrets} secret(s) skipped`);
+      }
+      const detail = details.length > 0 ? ` ${details.join("; ")}.` : "";
+      setNotice(`Imported ${report.importedServices} service(s).${detail}`);
+    } catch (cause) {
+      setLifecycleError(String(cause));
+    }
+  }
+
   return (
     <AppShell
       settingsOpen={settingsOpen}
@@ -256,6 +354,18 @@ function ProcessHubWorkspace() {
           message={lifecycleError}
           onDismiss={() => setLifecycleError(null)}
         />
+      )}
+      {notice && (
+        <div className="notice-banner" role="status">
+          <span>{notice}</span>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setNotice(null)}
+          >
+            <X size={13} />
+          </button>
+        </div>
       )}
       {searchOpen && (
         <ServiceSearch
@@ -317,6 +427,8 @@ function ProcessHubWorkspace() {
             setSettingsOpen(false);
             setStartupSettingsOpen(true);
           }}
+          onExport={() => void exportConfiguration()}
+          onImport={() => void importConfiguration()}
           onAbout={() => {
             setSettingsOpen(false);
             setAboutOpen(true);
@@ -408,6 +520,7 @@ function ProcessHubWorkspace() {
         <ServiceFormModal
           key={form.service?.id ?? "new"}
           service={form.service}
+          services={manager.services}
           busy={manager.busy !== null}
           onClose={() => setForm(null)}
           onSave={manager.saveService}
@@ -434,6 +547,31 @@ function App() {
         icon: <Plus size={14} />,
         onSelect: () => {
           window.dispatchEvent(new CustomEvent("processhub:new"));
+        },
+      },
+      { type: "separator", id: "workspace-sep-services" },
+      {
+        id: "workspace-start-all",
+        label: "Start all",
+        icon: <Play size={14} />,
+        onSelect: () => {
+          window.dispatchEvent(new CustomEvent("processhub:start-all"));
+        },
+      },
+      {
+        id: "workspace-restart-all",
+        label: "Restart all",
+        icon: <RotateCw size={14} />,
+        onSelect: () => {
+          window.dispatchEvent(new CustomEvent("processhub:restart-all"));
+        },
+      },
+      {
+        id: "workspace-stop-all",
+        label: "Stop all",
+        icon: <Square size={14} />,
+        onSelect: () => {
+          window.dispatchEvent(new CustomEvent("processhub:stop-all"));
         },
       },
       { type: "separator", id: "workspace-sep-1" },

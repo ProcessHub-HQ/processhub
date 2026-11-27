@@ -49,6 +49,7 @@ const png2icons = require("png2icons");
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const SVG_SRC = resolve(ROOT, "public/icon.svg");
+const TRAY_SVG_SRC = resolve(ROOT, "public/tray-icon.svg");
 
 const TAURI_ICONS = resolve(ROOT, "src-tauri/icons");
 const PUBLIC = resolve(ROOT, "public");
@@ -65,8 +66,8 @@ const REACT_ASSETS = resolve(ROOT, "src/assets");
  * Rasterise the SVG at a given size and return a PNG Buffer.
  * We always render from the original SVG to avoid resampling artefacts.
  */
-async function svgToPng(size) {
-  return sharp(SVG_SRC)
+async function svgToPng(size, source = SVG_SRC) {
+  return sharp(source)
     .resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png({ compressionLevel: 9 })
     .toBuffer();
@@ -139,6 +140,10 @@ async function main() {
   // src/assets/icon.png  (512×512, used in React UI e.g. About modal / splash)
   const px512 = await svgToPng(512);
   writePng(px512, resolve(REACT_ASSETS, "icon.png"));
+
+  // src-tauri/icons/tray-icon.png  (64×64 white rounded-rect tray icon)
+  const trayPng = await svgToPng(64, TRAY_SVG_SRC);
+  writePng(trayPng, resolve(TAURI_ICONS, "tray-icon.png"));
 
   // ─── Done ──────────────────────────────────────────────────────────────────
   console.log("\n" + "─".repeat(50));

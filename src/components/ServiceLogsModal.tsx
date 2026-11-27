@@ -1,5 +1,7 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Copy,
+  ExternalLink,
   Pencil,
   Play,
   RotateCw,
@@ -8,7 +10,15 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type MouseEvent,
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { parseAnsi } from "../lib/ansi";
 import type { LogEvent, RunHistory, RuntimeState, Service } from "../types";
 import { Button } from "./Button";
 import { useGlobalContextMenu } from "./ContextMenuProvider";
@@ -61,6 +71,35 @@ function formatMemory(bytes: number) {
     : `${megabytes.toFixed(0)} MB`;
 }
 
+const eventKeys = new WeakMap<LogEvent, number>();
+let nextEventKey = 1;
+
+function eventKey(event: LogEvent): number {
+  const existing = eventKeys.get(event);
+  if (existing !== undefined) return existing;
+  const key = nextEventKey;
+  nextEventKey += 1;
+  eventKeys.set(event, key);
+  return key;
+}
+
+const LogLine = memo(function LogLine({ event }: { event: LogEvent }) {
+  const segments = useMemo(() => parseAnsi(event.text), [event.text]);
+  return (
+    <div className={`log-line ${event.stream}`}>
+      <time>{formatTimestamp(event.timestampMs)}</time>
+      <span className="log-stream-label">{event.stream}</span>
+      <pre>
+        {segments.map((segment) => (
+          <span key={segment.offset} style={segment.style}>
+            {segment.text}
+          </span>
+        ))}
+      </pre>
+    </div>
+  );
+});
+
 export function ServiceLogsModal({
   service,
   tone,
@@ -86,6 +125,7 @@ export function ServiceLogsModal({
   const [pausedEvents, setPausedEvents] = useState<LogEvent[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retentionError, setRetentionError] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
   const streamRef = useRef<HTMLDivElement>(null);
   const { openContextMenu } = useGlobalContextMenu();
 
@@ -96,27 +136,34 @@ export function ServiceLogsModal({
   }, [onLoad, service.id]);
 
   const status = state?.status ?? "stopped";
-  const active = ["running", "starting", "stopping"].includes(status);
+  const active = [
+    "running",
+    "starting",
+    "stopping",
+    "waiting_to_restart",
+  ].includes(status);
+  const waitingToRestart = status === "waiting_to_restart";
+  const [, setClockTick] = useState(0);
 
-  const processMeta = state?.pid
-    ? `PID ${state.pid}${state.startedAtMs ? ` · up ${formatUptime(state.startedAtMs)}` : ""}${state.cpuUsagePercent !== null && state.cpuUsagePercent !== undefined ? ` · CPU ${state.cpuUsagePercent.toFixed(1)}%` : ""}${state.memoryUsageBytes !== null && state.memoryUsageBytes !== undefined ? ` · ${formatMemory(state.memoryUsageBytes)}` : ""}`
-    : `${status.replace(/_/g, " ")}${state?.exitCode !== null && state?.exitCode !== undefined ? ` · exit ${state.exitCode}` : ""}`;
+  useEffect(() => {
+    if (!waitingToRestart) return;
+    const timer = window.setInterval(
+      () => setClockTick((tick) => tick + 1),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [waitingToRestart]);
 
-  const commandLine = [service.executable, ...service.arguments]
-    .filter(Boolean)
-    .join(" ");
+  const processMeta = waitingToRestart
+    ? `Restarting in ${Math.max(
+        0,
+        Math.ceil(((state?.restartAtMs ?? Date.now()) - Date.now()) / 1000),
+      )}s · attempt ${state?.restartAttempt ?? 1}`
+    : state?.pid
+      ? `PID ${state.pid}${state.startedAtMs ? ` · up ${formatUptime(state.startedAtMs)}` : ""}${state.cpuUsagePercent !== null && state.cpuUsagePercent !== undefined ? ` · CPU ${state.cpuUsagePercent.toFixed(1)}%` : ""}${state.memoryUsageBytes !== null && state.memoryUsageBytes !== undefined ? ` · ${formatMemory(state.memoryUsageBytes)}` : ""}`
+      : `${status.replace(/_/g, " ")}${state?.exitCode !== null && state?.exitCode !== undefined ? ` · exit ${state.exitCode}` : ""}`;
 
   const visibleEvents = paused ? (pausedEvents ?? events) : events;
-  const eventKeys = useMemo(
-    () =>
-      new Map(
-        visibleEvents.map((event, index) => [
-          event,
-          `${event.timestampMs}-${event.stream}-${index}`,
-        ]),
-      ),
-    [visibleEvents],
-  );
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return visibleEvents.filter((event) =>
@@ -126,10 +173,22 @@ export function ServiceLogsModal({
     );
   }, [query, visibleEvents]);
 
+  const eventCount = filteredEvents.length;
+
   useEffect(() => {
-    if (!paused && autoScroll)
+    if (!paused && autoScroll && eventCount > 0) {
       streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight });
-  });
+    }
+  }, [paused, autoScroll, eventCount]);
+
+  function openDetectedUrl() {
+    const url = state?.detectedUrl;
+    if (!url) return;
+    setOpenError(null);
+    void openUrl(url).catch(() =>
+      setOpenError("Could not open the detected URL."),
+    );
+  }
 
   function handleStreamContextMenu(event: MouseEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -182,6 +241,14 @@ export function ServiceLogsModal({
               <span className={`status-pill ${status}`}>
                 {busy ? "Working…" : status.replace(/_/g, " ")}
               </span>
+              {state && state.health !== "not_configured" && (
+                <span
+                  className={`health-pill ${state.health}`}
+                  title={state.healthError ?? "Health check"}
+                >
+                  {state.health}
+                </span>
+              )}
             </div>
             {service.description && (
               <p className="details-description">{service.description}</p>
@@ -193,6 +260,11 @@ export function ServiceLogsModal({
               {processMeta} · {visibleEvents.length} buffered events · max{" "}
               {service.logMaxSizeMb} MB/file
             </p>
+            {state?.healthError && (
+              <p className="details-health-error" role="status">
+                {state.healthError}
+              </p>
+            )}
           </div>
         </div>
         <Button
@@ -219,6 +291,11 @@ export function ServiceLogsModal({
         >
           Restart
         </Button>
+        {state?.detectedUrl && (
+          <Button icon={<ExternalLink size={13} />} onClick={openDetectedUrl}>
+            Open
+          </Button>
+        )}
         <span className="details-actions-divider" aria-hidden="true" />
         <Button icon={<Pencil size={13} />} onClick={onEdit}>
           Edit
@@ -232,20 +309,11 @@ export function ServiceLogsModal({
         </Button>
       </div>
 
-      <div className="details-meta-strip">
-        <div>
-          <span>Command</span>
-          <code title={commandLine}>{commandLine}</code>
-        </div>
-        {service.workingDirectory && (
-          <div>
-            <span>Directory</span>
-            <code title={service.workingDirectory}>
-              {service.workingDirectory}
-            </code>
-          </div>
-        )}
-      </div>
+      {openError && (
+        <p className="log-copy-error" role="alert">
+          {openError}
+        </p>
+      )}
 
       <details className="run-history">
         <summary>Recent runs · {runHistory.length}</summary>
@@ -335,7 +403,7 @@ export function ServiceLogsModal({
         className="log-stream"
         ref={streamRef}
         role="log"
-        aria-live={paused ? "off" : "polite"}
+        aria-live="off"
         onContextMenu={handleStreamContextMenu}
       >
         {filteredEvents.length === 0 ? (
@@ -346,14 +414,7 @@ export function ServiceLogsModal({
           </div>
         ) : (
           filteredEvents.map((event) => (
-            <div
-              className={`log-line ${event.stream}`}
-              key={eventKeys.get(event)}
-            >
-              <time>{formatTimestamp(event.timestampMs)}</time>
-              <span className="log-stream-label">{event.stream}</span>
-              <pre>{event.text}</pre>
-            </div>
+            <LogLine key={eventKey(event)} event={event} />
           ))
         )}
       </div>

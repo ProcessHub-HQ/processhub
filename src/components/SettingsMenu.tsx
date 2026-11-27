@@ -1,8 +1,10 @@
-import { Info, PowerIcon, Settings2 } from "lucide-react";
+import { Download, Info, PowerIcon, Settings2, Upload } from "lucide-react";
 import { useEffect } from "react";
 
 interface SettingsMenuProps {
   onAbout: () => void;
+  onExport: () => void;
+  onImport: () => void;
   onStartupSettings: () => void;
   onQuit: () => void;
   onClose: () => void;
@@ -10,6 +12,8 @@ interface SettingsMenuProps {
 
 export function SettingsMenu({
   onAbout,
+  onExport,
+  onImport,
   onStartupSettings,
   onQuit,
   onClose,
@@ -50,6 +54,16 @@ export function SettingsMenu({
         <Settings2 size={14} />
         <span>Startup settings</span>
       </button>
+      <div className="menu-rule" />
+      <button type="button" role="menuitem" onClick={onExport}>
+        <Download size={14} />
+        <span>Export configuration…</span>
+      </button>
+      <button type="button" role="menuitem" onClick={onImport}>
+        <Upload size={14} />
+        <span>Import configuration…</span>
+      </button>
+      <div className="menu-rule" />
       <button type="button" role="menuitem" onClick={onAbout}>
         <Info size={14} />
         <span>About</span>

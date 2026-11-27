@@ -1,21 +1,36 @@
 import { useCallback, useEffect, useState } from "react";
 import { processHubEvents } from "../lib/events";
 import { processHub } from "../lib/processhub";
-import type { CreateService, RuntimeState, Service } from "../types";
+import type {
+  CreateService,
+  EnvironmentVariable,
+  RuntimeState,
+  SecretDraft,
+  Service,
+} from "../types";
 
 export interface ServiceDraft {
   id?: string;
   name: string;
   description: string;
   iconPath: string | null;
+  dependsOn: string[];
   executable: string;
   argumentsText: string;
   workingDirectory: string;
   environmentText: string;
+  secrets: SecretDraft[];
   restartPolicy: Service["restartPolicy"];
   restartDelayMs: number;
+  maxRestartAttempts: number | null;
   stopGracePeriodMs: number;
   logMaxSizeMb: number;
+  healthCheckType: Service["healthCheckType"];
+  healthTarget: string;
+  healthIntervalMs: number;
+  healthTimeoutMs: number;
+  healthExpectedStatus: number | null;
+  healthStartPeriodMs: number;
   enabled: boolean;
   autoStart: boolean;
 }
@@ -88,7 +103,7 @@ export function useServiceManager() {
       const argumentsList = draft.argumentsText
         .split("\n")
         .filter((argument) => argument.length > 0);
-      const environment = draft.environmentText
+      const plainEnvironment: EnvironmentVariable[] = draft.environmentText
         .split("\n")
         .filter((line) => line.trim().length > 0)
         .map((line) => {
@@ -100,7 +115,7 @@ export function useServiceManager() {
           };
         });
       if (
-        environment.some(
+        plainEnvironment.some(
           (item) => !item.key || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.key),
         )
       ) {
@@ -109,9 +124,43 @@ export function useServiceManager() {
         );
         return false;
       }
+      const secrets = draft.secrets.map((secret) => ({
+        ...secret,
+        key: secret.key.trim(),
+      }));
+      if (
+        secrets.some(
+          (secret) =>
+            !/^[A-Za-z_][A-Za-z0-9_]*$/.test(secret.key) ||
+            (!secret.existing && secret.value.length === 0),
+        )
+      ) {
+        setError("Secrets need a valid name and a value.");
+        return false;
+      }
+      const allKeys = [
+        ...plainEnvironment.map((item) => item.key),
+        ...secrets.map((secret) => secret.key),
+      ];
+      if (new Set(allKeys).size !== allKeys.length) {
+        setError("Environment and secret names must be unique.");
+        return false;
+      }
+      const environment: EnvironmentVariable[] = [
+        ...plainEnvironment,
+        ...secrets.map((secret) => ({
+          key: secret.key,
+          value: "",
+          isSecret: true,
+        })),
+      ];
+      const secretsToWrite = secrets.filter(
+        (secret) => secret.value.length > 0,
+      );
       setBusy(draft.id ?? "new");
       setError(null);
       try {
+        let serviceId = draft.id;
         if (draft.id) {
           const service = services.find((item) => item.id === draft.id);
           if (!service) throw new Error("This service is no longer available");
@@ -120,14 +169,22 @@ export function useServiceManager() {
             name: draft.name.trim(),
             description: draft.description.trim() || null,
             iconPath: draft.iconPath,
+            dependsOn: draft.dependsOn,
             executable: draft.executable.trim(),
             arguments: argumentsList,
             workingDirectory: draft.workingDirectory.trim() || null,
             environment,
             restartPolicy: draft.restartPolicy,
             restartDelayMs: draft.restartDelayMs,
+            maxRestartAttempts: draft.maxRestartAttempts,
             stopGracePeriodMs: draft.stopGracePeriodMs,
             logMaxSizeMb: draft.logMaxSizeMb,
+            healthCheckType: draft.healthCheckType,
+            healthTarget: draft.healthTarget.trim() || null,
+            healthIntervalMs: draft.healthIntervalMs,
+            healthTimeoutMs: draft.healthTimeoutMs,
+            healthExpectedStatus: draft.healthExpectedStatus,
+            healthStartPeriodMs: draft.healthStartPeriodMs,
             enabled: draft.enabled,
             autoStart: draft.autoStart,
           });
@@ -142,14 +199,31 @@ export function useServiceManager() {
             description: draft.description.trim() || null,
             enabled: draft.enabled,
             autoStart: draft.autoStart,
+            dependsOn: draft.dependsOn,
             restartPolicy: draft.restartPolicy,
             restartDelayMs: draft.restartDelayMs,
-            maxRestartAttempts: 5,
+            maxRestartAttempts: draft.maxRestartAttempts,
             priority: "normal",
             stopGracePeriodMs: draft.stopGracePeriodMs,
             logMaxSizeMb: draft.logMaxSizeMb,
+            healthCheckType: draft.healthCheckType,
+            healthTarget: draft.healthTarget.trim() || null,
+            healthIntervalMs: draft.healthIntervalMs,
+            healthTimeoutMs: draft.healthTimeoutMs,
+            healthExpectedStatus: draft.healthExpectedStatus,
+            healthStartPeriodMs: draft.healthStartPeriodMs,
           };
-          await processHub.createService(input);
+          const created = await processHub.createService(input);
+          serviceId = created.id;
+        }
+        if (serviceId) {
+          for (const secret of secretsToWrite) {
+            await processHub.setServiceSecret(
+              serviceId,
+              secret.key,
+              secret.value,
+            );
+          }
         }
         await refresh();
         return true;

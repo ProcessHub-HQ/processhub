@@ -5,7 +5,27 @@ import type { LogEvent, RunHistory } from "../types";
 
 const MAX_EVENTS_PER_SERVICE = 2_000;
 const MAX_PENDING_EVENTS_PER_SERVICE = 4_000;
+const MAX_BUFFER_BYTES_PER_SERVICE = 4 * 1024 * 1024;
+const EVENT_OVERHEAD_BYTES = 96;
 const FLUSH_INTERVAL_MS = 50;
+
+function trimEvents(events: LogEvent[]): LogEvent[] {
+  const bounded =
+    events.length > MAX_EVENTS_PER_SERVICE
+      ? events.slice(-MAX_EVENTS_PER_SERVICE)
+      : events;
+  let bytes = 0;
+  let start = bounded.length;
+  while (start > 0) {
+    const size = bounded[start - 1].text.length + EVENT_OVERHEAD_BYTES;
+    if (bytes + size > MAX_BUFFER_BYTES_PER_SERVICE && start < bounded.length) {
+      break;
+    }
+    bytes += size;
+    start -= 1;
+  }
+  return start === 0 ? bounded : bounded.slice(start);
+}
 
 export function useServiceLogs() {
   const [events, setEvents] = useState<Record<string, LogEvent[]>>({});
@@ -35,9 +55,11 @@ export function useServiceLogs() {
       );
       return {
         ...current,
-        [serviceId]: [...unique.values()]
-          .sort((left, right) => left.timestampMs - right.timestampMs)
-          .slice(-MAX_EVENTS_PER_SERVICE),
+        [serviceId]: trimEvents(
+          [...unique.values()].sort(
+            (left, right) => left.timestampMs - right.timestampMs,
+          ),
+        ),
       };
     });
     setRunHistory((current) => ({ ...current, [serviceId]: savedRuns }));
@@ -65,10 +87,10 @@ export function useServiceLogs() {
         setEvents((current) => {
           const next = { ...current };
           for (const [serviceId, incoming] of Object.entries(batch)) {
-            next[serviceId] = [
+            next[serviceId] = trimEvents([
               ...(current[serviceId] ?? []),
               ...incoming,
-            ].slice(-MAX_EVENTS_PER_SERVICE);
+            ]);
           }
           return next;
         });
@@ -85,19 +107,21 @@ export function useServiceLogs() {
     };
     const interval = window.setInterval(flush, FLUSH_INTERVAL_MS);
     void processHubEvents
-      .onLog((event) => {
-        const servicePending = pending.current[event.serviceId] ?? [];
-        servicePending.push(event);
-        const overflow = Math.max(
-          0,
-          servicePending.length - MAX_PENDING_EVENTS_PER_SERVICE,
-        );
-        if (overflow > 0) {
-          servicePending.splice(0, overflow);
-          pendingDrops.current[event.serviceId] =
-            (pendingDrops.current[event.serviceId] ?? 0) + overflow;
+      .onLogBatch((events) => {
+        for (const event of events) {
+          const servicePending = pending.current[event.serviceId] ?? [];
+          servicePending.push(event);
+          const overflow = Math.max(
+            0,
+            servicePending.length - MAX_PENDING_EVENTS_PER_SERVICE,
+          );
+          if (overflow > 0) {
+            servicePending.splice(0, overflow);
+            pendingDrops.current[event.serviceId] =
+              (pendingDrops.current[event.serviceId] ?? 0) + overflow;
+          }
+          pending.current[event.serviceId] = servicePending;
         }
-        pending.current[event.serviceId] = servicePending;
       })
       .then((stop) => {
         if (disposed) stop();
@@ -108,7 +132,11 @@ export function useServiceLogs() {
       });
     void processHubEvents
       .onRuntimeState((state) => {
-        if (["stopped", "exited", "failed"].includes(state.status)) {
+        if (
+          ["stopped", "exited", "failed", "waiting_to_restart"].includes(
+            state.status,
+          )
+        ) {
           void load(state.serviceId).catch(() => {});
         }
       })

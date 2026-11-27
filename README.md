@@ -37,9 +37,17 @@ Define a service once—such as a Next.js dev server, Laravel app, Redis instanc
 - **Direct Process Execution** — Runs configured executables and argument vectors directly with a dedicated working directory and environment variables—no silent shell interpolation.
 - **Reliable Process-Tree Shutdown** — Isolates each service in a dedicated POSIX process group on macOS/Linux and uses `taskkill /T` (with force-kill fallback) on Windows so child processes don't linger.
 - **Crash & Restart Recovery** — Persists tracked process identities (`pid`, process group ID, start time, executable path, and session ID) in SQLite. Gracefully stops services on quit, and verifies process identity after a crash before cleaning up orphaned trees—never signaling an unrelated reused PID.
+- **Restart Policies** — Restart on failure or always, with exponential backoff capped at 30 seconds, a configurable attempt limit, a stable-uptime reset, and a visible countdown while a restart is pending. Explicit stops and manual starts cancel or reset the schedule.
 - **Single-Instance Enforcement** — Launching a second ProcessHub window focuses the existing instance instead of spawning duplicate supervisors.
-- **Live Logs & Run History** — Streams `stdout` and `stderr` with bounded UI buffering (up to 2,000 events per service, batched every 50 ms), persists newline-delimited JSON logs with 10 MiB rotation (3 rotated files) and configurable retention (`7` / `14` / `30` / `90` days), and keeps the latest 20 completed runs per service in SQLite.
+- **Live Logs & Run History** — Streams `stdout` and `stderr` with a batched 100 ms disk pipeline, ANSI-colored rendering (16/256/truecolor), bounded UI buffering (up to 2,000 events or 4 MiB per service, batched every 50 ms), persisted newline-delimited JSON logs with 10 MiB rotation (3 rotated files) and configurable retention (`7` / `14` / `30` / `90` days), and keeps the latest 20 completed runs per service in SQLite.
 - **Resource Monitoring** — Samples root-process CPU and memory estimates every second.
+- **Secret Environment Values** — Secrets are stored in the OS keychain, redacted from logs, excluded from exports, and required before a service starts.
+- **Desktop Notifications** — Failed services and unhealthy checks notify when the main window is hidden; tray submenus offer per-service start, stop, restart, details, and Open URL.
+- **Health Checks** — TCP-port or HTTP readiness with a start-period grace window, configurable interval/timeout, and an optional expected status. Process state and health are reported separately.
+- **Detected URLs** — Finds the first local URL or `host:port` in service output and offers a one-click Open action, reset per run.
+- **Dependencies** — Mark services as "Start after" another service; starts resolve dependencies in order and wait for health when configured, with cycle-safe validation.
+- **Configuration Backup** — Export services, dependencies, and settings to JSON; import with automatic name de-duplication, dependency remapping, and missing-directory/icon/secret cleanup reporting.
+- **Bulk Actions** — Start all, restart all, and stop all from the workspace context menu, respecting dependency order and health gates.
 - **System Tray & Autostart** — Lives cleanly in the system tray, supports launching at OS login, and can auto-start selected services.
 - **Custom Service Icons & Export** — Import PNG, JPEG, or WebP icons into app-managed storage (`$APPDATA/icons`), duplicate services, search/filter, and export configurations.
 
@@ -51,9 +59,9 @@ ProcessHub is built to be predictable, local-only, and safe by default. Key desi
 |---|---|
 | **Execution model** | Direct executable + argument vector execution; shell mode is rejected until explicitly implemented. |
 | **Local storage** | Embedded SQLite via `rusqlite` with versioned `user_version` migrations; async process I/O never holds the DB lock. |
-| **Environment secrets** | Only non-secret environment values are persisted; `isSecret: true` is rejected until OS-backed secure storage is added. |
+| **Environment secrets** | Secret values live in the OS keychain; SQLite, exports, and logs never contain them. Output is redacted and a missing secret blocks startup. |
 | **App diagnostics** | Lifecycle and process events are written locally via `tauri-plugin-log`, excluding service arguments and environment values. |
-| **UI architecture** | Focused in-house React components and hooks on a light, no-scroll desktop canvas (`1120 × 760` default, `860 × 700` minimum). |
+| **UI architecture** | Focused in-house React components and hooks on a light, no-scroll desktop canvas (`800 × 500` fixed window). |
 
 See [PLAN.md](PLAN.md) for the full engineering roadmap and phase status.
 
@@ -99,7 +107,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 |---|---|
 | **Desktop Shell** | [Tauri 2](https://v2.tauri.app/) (`single-instance`, `tray-icon`, `autostart`, `dialog`, `log`, `opener`) |
 | **Frontend** | React 19, TypeScript, Vite, Lucide Icons |
-| **Backend** | Rust (2024 edition), Tokio, `rusqlite` (bundled SQLite), `sysinfo` |
+| **Backend** | Rust (2024 edition), Tokio, `rusqlite` (bundled SQLite), `sysinfo`, `keyring` |
 | **Tooling** | Biome (TS/CSS lint & format), `rustfmt`, `clippy`, GitHub Actions |
 
 ## Project Structure
@@ -117,4 +125,4 @@ processhub/
 
 - **CPU & Memory metrics** are sampled once per second for the root process only and displayed as estimates; child processes are excluded.
 - **Windows crash recovery** currently uses `taskkill /T /F` with PID + start-time verification; descendants that outlive the root cannot be verified without Windows Job Objects (tracked as a follow-up in [docs/architecture.md](docs/architecture.md)).
-- **Secret environment variables** are intentionally rejected until OS keychain integration is implemented.
+- **Secret environment variables** use the OS keychain (Keychain / Credential Manager / Secret Service). Removing a secret deletes its keychain entry.

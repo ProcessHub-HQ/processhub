@@ -6,6 +6,6 @@ export const processHubEvents = {
     handler: (state: RuntimeState) => void,
   ): Promise<UnlistenFn> =>
     listen<RuntimeState>("service-state", ({ payload }) => handler(payload)),
-  onLog: (handler: (event: LogEvent) => void): Promise<UnlistenFn> =>
-    listen<LogEvent>("service-log", ({ payload }) => handler(payload)),
+  onLogBatch: (handler: (events: LogEvent[]) => void): Promise<UnlistenFn> =>
+    listen<LogEvent[]>("service-log-batch", ({ payload }) => handler(payload)),
 };
