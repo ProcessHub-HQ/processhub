@@ -20,7 +20,9 @@
         "maxWidth": 800,
         "maxHeight": 500,
         "resizable": false,
-        "visible": true
+        "visible": true,
+        "theme": "Dark",
+        "backgroundColor": "#17181a"
       }
     ],
     "security": {

@@ -61,7 +61,7 @@ ProcessHub is built to be predictable, local-only, and safe by default. Key desi
 | **Local storage** | Embedded SQLite via `rusqlite` with versioned `user_version` migrations; async process I/O never holds the DB lock. |
 | **Environment secrets** | Secret values live in the OS keychain; SQLite, exports, and logs never contain them. Output is redacted and a missing secret blocks startup. |
 | **App diagnostics** | Lifecycle and process events are written locally via `tauri-plugin-log`, excluding service arguments and environment values. |
-| **UI architecture** | Focused in-house React components and hooks on a light, no-scroll desktop canvas (`800 × 500` fixed window). |
+| **UI architecture** | Focused in-house React components and hooks on a dark, no-scroll desktop canvas (`800 × 500` fixed window). |
 
 See [PLAN.md](PLAN.md) for the full engineering roadmap and phase status.
 

@@ -17,27 +17,27 @@ interface AnsiState {
   inverse: boolean;
 }
 
-const DEFAULT_FG = "#4d5865";
-const DEFAULT_BG = "#f8f9fb";
+const DEFAULT_FG = "#c6cbd3";
+const DEFAULT_BG = "#141518";
 
-// VS Code light-terminal palette; readable on the app's light log canvas.
+// VS Code dark-terminal palette; readable on the app's dark log canvas.
 const ANSI_16 = [
   "#000000",
   "#cd3131",
-  "#00bc00",
-  "#949800",
-  "#0451a5",
-  "#bc05bc",
-  "#0598bc",
-  "#555555",
+  "#0dbc79",
+  "#e5e510",
+  "#2472c8",
+  "#bc3fbc",
+  "#11a8cd",
+  "#e5e5e5",
   "#666666",
-  "#cd3131",
-  "#14ce14",
-  "#b5ba00",
-  "#0451a5",
-  "#bc05bc",
-  "#0598bc",
-  "#a5a5a5",
+  "#f14c4c",
+  "#23d18b",
+  "#f5f543",
+  "#3b8eea",
+  "#d670d6",
+  "#29b8db",
+  "#ffffff",
 ];
 
 const ESC = String.fromCharCode(27);

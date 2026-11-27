@@ -159,7 +159,7 @@ export interface UpdateProgress {
 }
 
 export interface AppSettings {
-  theme: "light";
+  theme: "dark";
   startAtLogin: boolean;
   startMinimized: boolean;
   closeToTray: boolean;
