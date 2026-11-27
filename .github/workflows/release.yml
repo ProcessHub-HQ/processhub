@@ -1,12 +1,25 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (for example v2.3.3)"
+        required: true
+        type: string
+      draft:
+        description: "Create the GitHub release as a draft"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
   release:
+    name: release (${{ matrix.target || matrix.platform }})
     permissions:
       contents: write
     strategy:
@@ -14,15 +27,22 @@ jobs:
       matrix:
         include:
           - platform: ubuntu-22.04
+            args: ""
           - platform: windows-latest
+            args: ""
           - platform: macos-latest
-          - platform: macos-15-intel
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag }}
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
@@ -35,10 +55,13 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          key: ${{ matrix.target || matrix.platform }}
 
       - name: Install Linux dependencies
         if: startsWith(matrix.platform, 'ubuntu')
@@ -66,7 +89,7 @@ jobs:
         shell: bash
         run: |
           git fetch --tags --force
-          node scripts/release-notes.mjs --tag "${{ github.ref_name }}" > "$RUNNER_TEMP/release-notes.md"
+          node scripts/release-notes.mjs --tag "${{ inputs.tag }}" > "$RUNNER_TEMP/release-notes.md"
           {
             echo 'body<<RELEASE_NOTES_EOF'
             cat "$RUNNER_TEMP/release-notes.md"
@@ -80,8 +103,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "ProcessHub ${{ github.ref_name }}"
+          args: ${{ matrix.args }}
+          tagName: ${{ inputs.tag }}
+          releaseName: "ProcessHub ${{ inputs.tag }}"
           releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: false
+          releaseDraft: ${{ inputs.draft }}
           prerelease: false

@@ -28,12 +28,15 @@ function parseArgs(argv) {
   let target = null;
   let dryRun = false;
   let noPush = false;
+  let draft = false;
 
   for (const arg of argv) {
     if (arg === "--dry-run") {
       dryRun = true;
     } else if (arg === "--no-push") {
       noPush = true;
+    } else if (arg === "--draft") {
+      draft = true;
     } else if (arg === "-h" || arg === "--help") {
       printUsage(0);
     } else if (!arg.startsWith("-") && !target) {
@@ -48,18 +51,21 @@ function parseArgs(argv) {
     printUsage(1);
   }
 
-  return { target, dryRun, noPush };
+  return { target, dryRun, noPush, draft };
 }
 
 function printUsage(code) {
   console.log(
     [
-      "Usage: pnpm release <version|patch|minor|major> [--dry-run] [--no-push]",
+      "Usage: pnpm release <version|patch|minor|major> [--dry-run] [--no-push] [--draft]",
       "",
       "Examples:",
       "  pnpm release 0.1.0",
       "  pnpm release patch",
       "  pnpm release 0.2.0 --dry-run",
+      "  pnpm release patch --draft",
+      "",
+      "Requires the GitHub CLI (gh), authenticated with push access.",
     ].join("\n"),
   );
   process.exit(code);
@@ -150,8 +156,33 @@ function ensureTagDoesNotExist(tag) {
   }
 }
 
+function ensureGhReady() {
+  try {
+    const branch = run(
+      "gh",
+      [
+        "repo",
+        "view",
+        "--json",
+        "defaultBranchRef",
+        "--jq",
+        ".defaultBranchRef.name",
+      ],
+      { capture: true },
+    ).trim();
+    if (!branch) {
+      throw new Error("empty default branch");
+    }
+    return branch;
+  } catch {
+    throw new Error(
+      "GitHub CLI is required to dispatch the release workflow. Install gh and run `gh auth login`.",
+    );
+  }
+}
+
 function main() {
-  const { target, dryRun, noPush } = parseArgs(process.argv.slice(2));
+  const { target, dryRun, noPush, draft } = parseArgs(process.argv.slice(2));
   const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, "utf8"));
   const nextVersion = resolveNextVersion(pkg.version, target);
   const tag = `v${nextVersion}`;
@@ -162,6 +193,7 @@ function main() {
     ensureCleanWorkingTree();
   }
   ensureTagDoesNotExist(tag);
+  const dispatchRef = !dryRun && !noPush ? ensureGhReady() : "";
 
   const previousTag = latestTag();
   const notes = generateReleaseNotes({
@@ -185,7 +217,11 @@ function main() {
   );
 
   if (dryRun) {
-    console.log(`\nDry run complete. Would tag ${tag} and ${noPush ? "skip push" : "push to origin"}.`);
+    console.log(
+      `\nDry run complete. Would tag ${tag} and ${
+        noPush ? "skip push" : "push to origin, then dispatch release.yml"
+      }${draft ? " as a draft release" : ""}.`,
+    );
     return;
   }
 
@@ -227,6 +263,32 @@ function main() {
     run("git", ["push", "origin", branch]);
     run("git", ["push", "origin", tag]);
     console.log(`Pushed ${branch} and ${tag} to origin.`);
+
+    const dispatchArgs = [
+      "workflow",
+      "run",
+      "release.yml",
+      "--ref",
+      dispatchRef,
+      "-f",
+      `tag=${tag}`,
+    ];
+    if (draft) {
+      dispatchArgs.push("-f", "draft=true");
+    }
+
+    try {
+      run("gh", dispatchArgs);
+    } catch {
+      throw new Error(
+        `Tag ${tag} was pushed, but dispatching the release workflow failed. Retry with:\n  gh ${dispatchArgs.join(" ")}`,
+      );
+    }
+    console.log(
+      `Dispatched the release workflow for ${tag} from ${dispatchRef}${
+        draft ? " as a draft" : ""
+      }. Follow it with: gh run watch`,
+    );
   }
 }
 

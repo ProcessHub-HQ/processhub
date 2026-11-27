@@ -43,10 +43,10 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 tauri = { version = "2", features = ["test"] }
 
 
-# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+# Thin LTO keeps CI release links fast; the extra minutes of fat LTO are not worth it here.
 [profile.release]
-codegen-units = 1
-lto = true
+codegen-units = 16
+lto = "thin"
 opt-level = 3
 panic = "abort"
 strip = true
