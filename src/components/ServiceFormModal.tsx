@@ -1,8 +1,8 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
 import { type FormEvent, useState } from "react";
-import type { ServiceDraft } from "../hooks/useServiceManager";
 import { newDraftId } from "../lib/ids";
+import type { ServiceDraft } from "../stores/servicesStore";
 import type { Service } from "../types";
 import { Button } from "./Button";
 import { ImageInput } from "./ImageInput";
