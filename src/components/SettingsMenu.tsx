@@ -1,4 +1,5 @@
 import {
+  ArrowUpCircle,
   Download,
   Info,
   PowerIcon,
@@ -13,6 +14,7 @@ import { Button } from "./Button";
 interface SettingsMenuProps {
   open: boolean;
   checkingUpdates: boolean;
+  updateVersion: string | null;
   onOpenChange: (open: boolean) => void;
   onAbout: () => void;
   onCheckUpdates: () => void;
@@ -25,6 +27,7 @@ interface SettingsMenuProps {
 export function SettingsMenu({
   open,
   checkingUpdates,
+  updateVersion,
   onOpenChange,
   onAbout,
   onCheckUpdates,
@@ -89,12 +92,19 @@ export function SettingsMenu({
             disabled={checkingUpdates}
             onClick={onCheckUpdates}
           >
-            <RefreshCw
-              className={checkingUpdates ? "is-spinning" : undefined}
-              size={14}
-            />
+            {checkingUpdates ? (
+              <RefreshCw className="is-spinning" size={14} />
+            ) : updateVersion ? (
+              <ArrowUpCircle size={14} />
+            ) : (
+              <RefreshCw size={14} />
+            )}
             <span>
-              {checkingUpdates ? "Checking for updates…" : "Check for updates…"}
+              {checkingUpdates
+                ? "Checking for updates…"
+                : updateVersion
+                  ? `Update to v${updateVersion}…`
+                  : "Check for updates…"}
             </span>
           </button>
           <div className="menu-rule" />

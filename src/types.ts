@@ -143,6 +143,21 @@ export interface UpdateInfo {
   date: string | null;
 }
 
+export type UpdatePhase =
+  | "idle"
+  | "checking"
+  | "current"
+  | "available"
+  | "downloading"
+  | "installing"
+  | "restarting"
+  | "error";
+
+export interface UpdateProgress {
+  downloaded: number;
+  total: number | null;
+}
+
 export interface AppSettings {
   theme: "light";
   startAtLogin: boolean;

@@ -7,6 +7,8 @@ import { useAppCommands } from "./useAppCommands";
 export function TopBar() {
   const settingsOpen = useUiStore((state) => state.settingsOpen);
   const checkingForUpdates = useUiStore((state) => state.checkingForUpdates);
+  const availableUpdate = useUiStore((state) => state.availableUpdate);
+  const openUpdateDialog = useUiStore((state) => state.openUpdateDialog);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const openEditor = useUiStore((state) => state.openEditor);
   const checkForUpdates = useUiStore((state) => state.checkForUpdates);
@@ -32,12 +34,20 @@ export function TopBar() {
         <SettingsMenu
           open={settingsOpen}
           checkingUpdates={checkingForUpdates}
+          updateVersion={availableUpdate?.version ?? null}
           onOpenChange={setSettingsOpen}
           onStartupSettings={() => {
             setSettingsOpen(false);
             setStartupSettingsOpen(true);
           }}
-          onCheckUpdates={() => void checkForUpdates()}
+          onCheckUpdates={() => {
+            if (availableUpdate) {
+              setSettingsOpen(false);
+              openUpdateDialog();
+              return;
+            }
+            void checkForUpdates();
+          }}
           onExport={() => {
             setSettingsOpen(false);
             void exportConfiguration();

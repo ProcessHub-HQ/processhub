@@ -1,10 +1,20 @@
 import { create } from "zustand";
 import { processHub } from "../lib/processhub";
-import type { Service } from "../types";
+import type {
+  Service,
+  UpdateInfo,
+  UpdatePhase,
+  UpdateProgress,
+} from "../types";
 
 interface UiState {
   settingsOpen: boolean;
   checkingForUpdates: boolean;
+  availableUpdate: UpdateInfo | null;
+  updateOpen: boolean;
+  updatePhase: UpdatePhase;
+  updateProgress: UpdateProgress | null;
+  updateError: string | null;
   aboutOpen: boolean;
   startupSettingsOpen: boolean;
   quitConfirmationOpen: boolean;
@@ -31,11 +41,21 @@ interface UiState {
   setPendingDelete: (service: Service | null) => void;
   setSelectedId: (id: string | null) => void;
   checkForUpdates: () => Promise<void>;
+  openUpdateDialog: () => void;
+  closeUpdateDialog: () => void;
+  setUpdateProgress: (progress: UpdateProgress) => void;
+  setUpdatePhase: (phase: UpdatePhase) => void;
+  installUpdate: () => Promise<void>;
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
   settingsOpen: false,
   checkingForUpdates: false,
+  availableUpdate: null,
+  updateOpen: false,
+  updatePhase: "idle",
+  updateProgress: null,
+  updateError: null,
   aboutOpen: false,
   startupSettingsOpen: false,
   quitConfirmationOpen: false,
@@ -74,20 +94,90 @@ export const useUiStore = create<UiState>((set, get) => ({
     if (get().checkingForUpdates) return;
     set({
       checkingForUpdates: true,
+      settingsOpen: false,
+      updateOpen: true,
+      updatePhase: "checking",
+      availableUpdate: null,
+      updateProgress: null,
+      updateError: null,
       lifecycleError: null,
       notice: null,
     });
     try {
       const update = await processHub.checkForUpdate();
-      set({
-        notice: update
-          ? `ProcessHub ${update.version} is available.`
-          : "ProcessHub is up to date.",
-      });
+      if (update) {
+        set({
+          availableUpdate: update,
+          updatePhase: "available",
+        });
+      } else {
+        set({
+          availableUpdate: null,
+          updatePhase: "current",
+        });
+      }
     } catch (cause) {
-      set({ lifecycleError: String(cause) });
+      set({
+        updatePhase: "error",
+        updateError: String(cause),
+      });
     } finally {
-      set({ checkingForUpdates: false, settingsOpen: false });
+      set({ checkingForUpdates: false });
+    }
+  },
+
+  openUpdateDialog: () => {
+    if (get().availableUpdate) {
+      set({
+        updateOpen: true,
+        updatePhase: "available",
+        updateProgress: null,
+        settingsOpen: false,
+      });
+      return;
+    }
+    void get().checkForUpdates();
+  },
+
+  closeUpdateDialog: () => {
+    const phase = get().updatePhase;
+    if (
+      phase === "checking" ||
+      phase === "downloading" ||
+      phase === "installing" ||
+      phase === "restarting"
+    ) {
+      return;
+    }
+    set({ updateOpen: false });
+  },
+
+  setUpdateProgress: (updateProgress) => set({ updateProgress }),
+
+  setUpdatePhase: (updatePhase) => set({ updatePhase }),
+
+  installUpdate: async () => {
+    const { availableUpdate, updatePhase } = get();
+    if (
+      !availableUpdate ||
+      (updatePhase !== "available" && updatePhase !== "error")
+    ) {
+      return;
+    }
+    set({
+      updatePhase: "downloading",
+      updateProgress: { downloaded: 0, total: null },
+      updateError: null,
+    });
+    try {
+      await processHub.installUpdate();
+      set({ updatePhase: "restarting" });
+    } catch (cause) {
+      set({
+        updatePhase: "error",
+        updateError: String(cause),
+        updateProgress: null,
+      });
     }
   },
 }));

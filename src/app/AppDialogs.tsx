@@ -5,6 +5,7 @@ import { Modal } from "../components/Modal";
 import { ServiceFormModal } from "../components/ServiceFormModal";
 import { ServiceLogsModal } from "../components/ServiceLogsModal";
 import { StartupSettingsModal } from "../components/StartupSettingsModal";
+import { UpdateDialog } from "../components/UpdateDialog";
 import { processHub } from "../lib/processhub";
 import { useLogsStore } from "../stores/logsStore";
 import { useServicesStore } from "../stores/servicesStore";
@@ -53,6 +54,7 @@ export function AppDialogs() {
 
   return (
     <>
+      <UpdateDialog />
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {startupSettingsOpen && (
         <StartupSettingsModal onClose={() => setStartupSettingsOpen(false)} />

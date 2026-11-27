@@ -6,6 +6,7 @@ import { processHub } from "../lib/processhub";
 import { useLogsStore } from "../stores/logsStore";
 import { useServicesStore } from "../stores/servicesStore";
 import { useUiStore } from "../stores/uiStore";
+import type { UpdatePhase, UpdateProgress } from "../types";
 
 const FLUSH_INTERVAL_MS = 50;
 const TERMINAL_STATUSES = ["stopped", "exited", "failed", "waiting_to_restart"];
@@ -91,6 +92,12 @@ export function useProcessHubEvents() {
             );
         },
       ),
+      listen<UpdateProgress>("update-progress", ({ payload }) => {
+        useUiStore.getState().setUpdateProgress(payload);
+      }),
+      listen<{ status: UpdatePhase }>("update-status", ({ payload }) => {
+        useUiStore.getState().setUpdatePhase(payload.status);
+      }),
     ]).then((stops) => {
       if (disposed) {
         stops.forEach((stop) => {

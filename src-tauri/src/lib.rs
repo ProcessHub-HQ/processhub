@@ -6,7 +6,10 @@ mod process_manager;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    sync::Mutex,
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use tauri::{Emitter, Manager, Runtime};
@@ -20,6 +23,16 @@ pub(crate) struct AppState {
     pub(crate) database: Mutex<Database>,
     pub(crate) processes: ProcessManager,
     pub(crate) session_id: String,
+}
+
+static UPDATE_INSTALLING: AtomicBool = AtomicBool::new(false);
+
+struct UpdateInstallGuard;
+
+impl Drop for UpdateInstallGuard {
+    fn drop(&mut self) {
+        UPDATE_INSTALLING.store(false, Ordering::SeqCst);
+    }
 }
 
 /// Clears bookkeeping for a process that already exited, or verifies and stops
@@ -1091,13 +1104,80 @@ struct UpdateInfo {
 async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
     use tauri_plugin_updater::UpdaterExt;
     let updater = app.updater().map_err(|error| error.to_string())?;
-    let update = updater.check().await.map_err(|error| error.to_string())?;
+    let update = tokio::time::timeout(Duration::from_secs(2), updater.check())
+        .await
+        .map_err(|_| "Update check timed out.".to_string())?
+        .map_err(|error| error.to_string())?;
     Ok(update.map(|update| UpdateInfo {
         version: update.version,
         current_version: update.current_version,
         notes: update.body,
         date: update.date.map(|date| date.to_string()),
     }))
+}
+
+#[tauri::command]
+async fn install_update(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+
+    if UPDATE_INSTALLING.swap(true, Ordering::SeqCst) {
+        return Err("An update is already being installed.".into());
+    }
+    let _guard = UpdateInstallGuard;
+
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let Some(update) = tokio::time::timeout(Duration::from_secs(2), updater.check())
+        .await
+        .map_err(|_| "Update check timed out.".to_string())?
+        .map_err(|error| error.to_string())?
+    else {
+        return Err("No update is available.".into());
+    };
+
+    let _ = app.emit(
+        "update-status",
+        serde_json::json!({ "status": "downloading" }),
+    );
+    let progress_app = app.clone();
+    let mut downloaded: u64 = 0;
+    let bytes = update
+        .download(
+            move |chunk_length, content_length| {
+                downloaded = downloaded.saturating_add(chunk_length as u64);
+                let _ = progress_app.emit(
+                    "update-progress",
+                    serde_json::json!({
+                        "downloaded": downloaded,
+                        "total": content_length,
+                    }),
+                );
+            },
+            || {},
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let _ = app.emit(
+        "update-status",
+        serde_json::json!({ "status": "installing" }),
+    );
+    let failures = stop_all_services(app.clone(), state).await?;
+    if !failures.is_empty() {
+        return Err(format!(
+            "Could not stop all services before updating: {}",
+            failures.join("; ")
+        ));
+    }
+    update.install(&bytes).map_err(|error| error.to_string())?;
+
+    let _ = app.emit(
+        "update-status",
+        serde_json::json!({ "status": "restarting" }),
+    );
+    app.restart();
 }
 
 #[tauri::command]
@@ -1420,6 +1500,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_services,
             check_for_update,
+            install_update,
             set_service_secret,
             delete_service_secret,
             get_service,
