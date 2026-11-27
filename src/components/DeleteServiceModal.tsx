@@ -35,10 +35,10 @@ export function DeleteServiceModal({
         />
       </div>
       <div className="dialog-actions">
-        <Button size="xs" onClick={onClose} disabled={busy}>
+        <Button size="sm" onClick={onClose} disabled={busy}>
           Cancel
         </Button>
-        <Button size="xs" variant="danger" onClick={onConfirm} disabled={busy}>
+        <Button size="sm" variant="danger" onClick={onConfirm} disabled={busy}>
           {busy ? "Deleting…" : "Delete process"}
         </Button>
       </div>

@@ -88,7 +88,7 @@ export function StartupSettingsModal({ onClose }: StartupSettingsModalProps) {
           <h2 id="startup-settings-title">Startup &amp; tray</h2>
           <p>Choose what ProcessHub does when it opens or closes.</p>
         </div>
-        <Button size="xs" onClick={onClose}>
+        <Button size="sm" onClick={onClose}>
           Done
         </Button>
       </div>

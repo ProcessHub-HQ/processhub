@@ -72,11 +72,11 @@ export function AppDialogs() {
             </p>
           )}
           <div className="dialog-actions">
-            <Button size="xs" onClick={() => setQuitConfirmationOpen(false)}>
+            <Button size="sm" onClick={() => setQuitConfirmationOpen(false)}>
               Cancel
             </Button>
             <Button
-              size="xs"
+              size="sm"
               variant="danger"
               onClick={() => {
                 setLifecycleError(null);

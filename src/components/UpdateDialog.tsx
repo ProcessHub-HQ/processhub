@@ -181,7 +181,7 @@ export function UpdateDialog() {
       <div className="dialog-actions update-footer">
         {phase === "available" && (
           <Button
-            size="xs"
+            size="sm"
             variant="primary"
             icon={<Download size={13} />}
             onClick={() => void install()}
@@ -191,7 +191,7 @@ export function UpdateDialog() {
         )}
         {phase === "error" && (
           <Button
-            size="xs"
+            size="sm"
             variant="primary"
             icon={<RefreshCw size={13} />}
             onClick={() => void check()}

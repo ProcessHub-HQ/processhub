@@ -446,10 +446,10 @@ export function ServiceFormModal({
           )}
         </div>
         <div className="dialog-actions modal-fixed-footer">
-          <Button size="xs" onClick={onClose}>
+          <Button size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="xs" variant="primary" type="submit" disabled={busy}>
+          <Button size="sm" variant="primary" type="submit" disabled={busy}>
             {busy ? "Saving…" : service ? "Save changes" : "Save process"}
           </Button>
         </div>

@@ -311,7 +311,7 @@ export function ServiceLogsModal({
 
       <div className="details-actions">
         <Button
-          size="xs"
+          size="sm"
           variant={active ? "secondary" : "primary"}
           disabled={busy}
           icon={active ? <Square size={13} /> : <Play size={13} />}
@@ -320,7 +320,7 @@ export function ServiceLogsModal({
           {active ? "Stop" : "Start"}
         </Button>
         <Button
-          size="xs"
+          size="sm"
           disabled={busy}
           icon={<RotateCw size={13} />}
           onClick={onRestart}
@@ -329,7 +329,7 @@ export function ServiceLogsModal({
         </Button>
         {state?.detectedUrl && (
           <Button
-            size="xs"
+            size="sm"
             icon={<ExternalLink size={13} />}
             onClick={openDetectedUrl}
           >
@@ -337,11 +337,11 @@ export function ServiceLogsModal({
           </Button>
         )}
         <span className="details-actions-divider" aria-hidden="true" />
-        <Button size="xs" icon={<Pencil size={13} />} onClick={onEdit}>
+        <Button size="sm" icon={<Pencil size={13} />} onClick={onEdit}>
           Edit
         </Button>
         <Button
-          size="xs"
+          size="sm"
           className="details-delete-button"
           icon={<Trash2 size={13} />}
           onClick={onDelete}

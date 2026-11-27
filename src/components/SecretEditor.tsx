@@ -60,7 +60,7 @@ export function SecretEditor({ secrets, onChange }: SecretEditorProps) {
         </div>
       ))}
       <Button
-        size="xs"
+        size="sm"
         icon={<Plus size={12} />}
         onClick={() =>
           onChange([

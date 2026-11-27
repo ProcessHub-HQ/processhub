@@ -28,9 +28,9 @@ export function TopBar() {
       <span className="app-bar-title">ProcessHub</span>
       <div className="app-bar-actions">
         <Button
-          size="xs"
+          size="sm"
           variant="new"
-          icon={<Plus size={18} strokeWidth={1.9} />}
+          icon={<Plus size={16} strokeWidth={1.9} />}
           onClick={() => openEditor()}
         >
           New
