@@ -1,6 +1,7 @@
 import { Button } from "@processhub/design-system";
 import { Plus } from "lucide-react";
 import { SettingsMenu } from "../components/SettingsMenu";
+import { WindowControls } from "../components/WindowControls";
 import { useUiStore } from "../stores/uiStore";
 import { useAppCommands } from "./useAppCommands";
 
@@ -22,7 +23,9 @@ export function TopBar() {
   const { exportConfiguration, importConfiguration } = useAppCommands();
 
   return (
-    <header className="app-bar">
+    <header className="app-bar" data-tauri-drag-region>
+      <WindowControls />
+      <span className="app-bar-title">ProcessHub</span>
       <div className="app-bar-actions">
         <Button
           size="xs"

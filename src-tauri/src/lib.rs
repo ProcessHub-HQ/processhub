@@ -1317,6 +1317,13 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            #[cfg(not(target_os = "macos"))]
+            if let Some(window) = app.get_webview_window("main") {
+                // macOS keeps the native title bar as a transparent overlay so
+                // traffic lights and window corners stay native. Other
+                // platforms use the custom Mac-style controls in the app bar.
+                let _ = window.set_decorations(false);
+            }
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             let database = Database::open(data_dir.join("processhub.sqlite3"))?;
