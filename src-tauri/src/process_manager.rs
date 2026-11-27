@@ -5,7 +5,7 @@ use std::{
     process::Stdio,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -68,6 +68,8 @@ pub struct ProcessManager {
     /// generation is still the active one, which makes manual starts and stops
     /// cancel pending restarts without shared timers.
     next_generation: Arc<AtomicU64>,
+    /// Guards against spawning more than one shared metrics sampler task.
+    metrics_sampler_started: Arc<AtomicBool>,
     log_dir: Option<Arc<PathBuf>>,
     log_retention_days: Arc<AtomicU64>,
     /// Cached login-shell PATH, resolved once at startup on macOS/Linux.
@@ -108,6 +110,45 @@ fn unavailable_health(service: &Service) -> &'static str {
     } else {
         "not_configured"
     }
+}
+
+#[derive(Clone, Copy)]
+struct ProcessSample {
+    parent: Option<u32>,
+    cpu: f32,
+    memory: u64,
+}
+
+struct TreeMetrics {
+    root_cpu_percent: f32,
+    root_memory_bytes: u64,
+    tree_cpu_percent: f32,
+    tree_memory_bytes: u64,
+    process_count: u32,
+}
+
+/// Sums the processes whose parent chain reaches `root`, including the root
+/// itself. The depth bound keeps malformed parent links from looping forever.
+fn aggregate_tree(root: u32, samples: &HashMap<u32, ProcessSample>) -> (f32, u64, u32) {
+    let mut cpu = 0.0_f32;
+    let mut memory = 0_u64;
+    let mut count = 0_u32;
+    for (pid, sample) in samples {
+        let mut current = *pid;
+        for _ in 0..=samples.len() {
+            if current == root {
+                cpu += sample.cpu;
+                memory = memory.saturating_add(sample.memory);
+                count = count.saturating_add(1);
+                break;
+            }
+            let Some(parent) = samples.get(&current).and_then(|node| node.parent) else {
+                break;
+            };
+            current = parent;
+        }
+    }
+    (cpu, memory, count)
 }
 
 impl ProcessManager {
@@ -203,6 +244,9 @@ impl ProcessManager {
                 started_at_ms: None,
                 cpu_usage_percent: None,
                 memory_usage_bytes: None,
+                tree_cpu_usage_percent: None,
+                tree_memory_bytes: None,
+                process_count: None,
                 metrics_sampled_at_ms: None,
                 health: unavailable_health(&service).into(),
                 health_checked_at_ms: None,
@@ -252,6 +296,9 @@ impl ProcessManager {
                         started_at_ms: Some(now_ms()),
                         cpu_usage_percent: None,
                         memory_usage_bytes: None,
+                        tree_cpu_usage_percent: None,
+                        tree_memory_bytes: None,
+                        process_count: None,
                         metrics_sampled_at_ms: None,
                         health: initial_health(&service).into(),
                         health_checked_at_ms: None,
@@ -335,6 +382,9 @@ impl ProcessManager {
                         started_at_ms: None,
                         cpu_usage_percent: None,
                         memory_usage_bytes: None,
+                        tree_cpu_usage_percent: None,
+                        tree_memory_bytes: None,
+                        process_count: None,
                         metrics_sampled_at_ms: None,
                         health: unavailable_health(&service).into(),
                         health_checked_at_ms: None,
@@ -388,6 +438,9 @@ impl ProcessManager {
                     started_at_ms: None,
                     cpu_usage_percent: None,
                     memory_usage_bytes: None,
+                    tree_cpu_usage_percent: None,
+                    tree_memory_bytes: None,
+                    process_count: None,
                     metrics_sampled_at_ms: None,
                     health: unavailable_health(&service).into(),
                     health_checked_at_ms: None,
@@ -408,15 +461,17 @@ impl ProcessManager {
         if let Some(state) = app.try_state::<crate::AppState>() {
             let save_result = match active_process_record(&service.id, pid, &state.session_id).await
             {
-                Ok(Some(record)) => state
-                    .database
-                    .lock()
-                    .map_err(|_| "Database lock poisoned".to_string())
-                    .and_then(|mut database| {
-                        database
-                            .save_active_process(&record)
-                            .map_err(|error| error.to_string())
-                    }),
+                Ok(Some(record)) => tokio::task::block_in_place(|| {
+                    state
+                        .database
+                        .lock()
+                        .map_err(|_| "Database lock poisoned".to_string())
+                        .and_then(|mut database| {
+                            database
+                                .save_active_process(&record)
+                                .map_err(|error| error.to_string())
+                        })
+                }),
                 Ok(None) => Ok(()),
                 Err(error) => Err(error),
             };
@@ -432,6 +487,9 @@ impl ProcessManager {
                         started_at_ms: None,
                         cpu_usage_percent: None,
                         memory_usage_bytes: None,
+                        tree_cpu_usage_percent: None,
+                        tree_memory_bytes: None,
+                        process_count: None,
                         metrics_sampled_at_ms: None,
                         health: unavailable_health(&service).into(),
                         health_checked_at_ms: None,
@@ -466,6 +524,9 @@ impl ProcessManager {
                         started_at_ms: Some(started_at_ms),
                         cpu_usage_percent: None,
                         memory_usage_bytes: None,
+                        tree_cpu_usage_percent: None,
+                        tree_memory_bytes: None,
+                        process_count: None,
                         metrics_sampled_at_ms: None,
                         health: initial_health(&service).into(),
                         health_checked_at_ms: None,
@@ -488,6 +549,7 @@ impl ProcessManager {
             service.id,
             pid
         );
+        self.ensure_metrics_sampler(app.clone());
 
         let (log_tx, mut log_rx) = mpsc::channel::<LogEvent>(1024);
         let service_id = service.id.clone();
@@ -566,49 +628,6 @@ impl ProcessManager {
         if let Some(stderr) = child.stderr.take() {
             spawn_reader(stderr, service.id.clone(), "stderr", log_tx.clone());
         }
-
-        let metrics_manager = self.clone();
-        let metrics_app = app.clone();
-        let metrics_service_id = service.id.clone();
-        let mut metrics_done = done.subscribe();
-        tokio::spawn(async move {
-            let mut system = match System::new() {
-                Ok(system) => system,
-                Err(error) => {
-                    log::warn!(
-                        "event=process_metrics_unavailable service_id={} error={}",
-                        metrics_service_id,
-                        error
-                    );
-                    return;
-                }
-            };
-            let process_pid = Pid::from_u32(pid);
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
-            let mut samples = 0_u8;
-            loop {
-                tokio::select! {
-                    _ = metrics_done.changed() => break,
-                    _ = interval.tick() => {
-                        system.refresh_processes_specifics(
-                            ProcessesToUpdate::Some(&[process_pid]),
-                            true,
-                            ProcessRefreshKind::nothing().with_cpu().with_memory(),
-                        );
-                        if let Some(process) = system.process(process_pid) {
-                            samples = samples.saturating_add(1);
-                            metrics_manager.set_metrics(
-                                &metrics_service_id,
-                                generation,
-                                (samples > 1).then_some(process.cpu_usage()),
-                                Some(process.memory()),
-                                &metrics_app,
-                            );
-                        }
-                    }
-                }
-            }
-        });
 
         if service.health_configured() {
             let health_manager = self.clone();
@@ -729,7 +748,7 @@ impl ProcessManager {
                 error: wait_error.clone(),
             };
             if let Some(app_state) = app.try_state::<crate::AppState>() {
-                match app_state.database.lock() {
+                tokio::task::block_in_place(|| match app_state.database.lock() {
                     Ok(mut database) => {
                         if let Err(error) = database.insert_run_history(&run) {
                             log::error!(
@@ -750,7 +769,7 @@ impl ProcessManager {
                         "event=run_history_write_failed service_id={} error=database_lock_poisoned",
                         service_id
                     ),
-                }
+                });
             }
             manager.emit_lifecycle_state(&service_id, &app);
             let failed = outcome.status == "failed" || !matches!(exit_code, Some(0));
@@ -891,12 +910,92 @@ impl ProcessManager {
         Ok(())
     }
 
-    fn set_metrics<R: Runtime>(
+    fn ensure_metrics_sampler<R: Runtime>(&self, app: AppHandle<R>) {
+        if self.metrics_sampler_started.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let manager = self.clone();
+        tokio::spawn(async move {
+            // One System is reused across ticks so sysinfo can derive CPU
+            // usage from the delta between refreshes.
+            let mut system = match System::new() {
+                Ok(system) => system,
+                Err(error) => {
+                    log::warn!("event=process_metrics_unavailable error={}", error);
+                    return;
+                }
+            };
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+            loop {
+                interval.tick().await;
+                let running = manager.running_snapshot();
+                if running.is_empty() {
+                    continue;
+                }
+                system.refresh_processes_specifics(
+                    ProcessesToUpdate::All,
+                    true,
+                    ProcessRefreshKind::nothing().with_cpu().with_memory(),
+                );
+                let samples = system
+                    .processes()
+                    .iter()
+                    .map(|(pid, process)| {
+                        (
+                            pid.as_u32(),
+                            ProcessSample {
+                                parent: process.parent().map(Pid::as_u32),
+                                cpu: process.cpu_usage(),
+                                memory: process.memory(),
+                            },
+                        )
+                    })
+                    .collect::<HashMap<_, _>>();
+                for (service_id, generation, root_pid) in running {
+                    let Some(root) = samples.get(&root_pid) else {
+                        continue;
+                    };
+                    let (tree_cpu, tree_memory, process_count) = aggregate_tree(root_pid, &samples);
+                    manager.set_tree_metrics(
+                        &service_id,
+                        generation,
+                        TreeMetrics {
+                            root_cpu_percent: root.cpu,
+                            root_memory_bytes: root.memory,
+                            tree_cpu_percent: tree_cpu,
+                            tree_memory_bytes: tree_memory,
+                            process_count,
+                        },
+                        &app,
+                    );
+                }
+            }
+        });
+    }
+
+    fn running_snapshot(&self) -> Vec<(String, u64, u32)> {
+        self.entries
+            .lock()
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|(id, entry)| {
+                        if entry.state.status != "running" {
+                            return None;
+                        }
+                        Some((id.clone(), entry.generation, entry.state.pid?))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn set_tree_metrics<R: Runtime>(
         &self,
         id: &str,
         generation: u64,
-        cpu_usage_percent: Option<f32>,
-        memory_usage_bytes: Option<u64>,
+        metrics: TreeMetrics,
         app: &AppHandle<R>,
     ) {
         let updated = if let Ok(mut entries) = self.entries.lock() {
@@ -904,8 +1003,11 @@ impl ProcessManager {
                 && entry.generation == generation
                 && entry.state.status == "running"
             {
-                entry.state.cpu_usage_percent = cpu_usage_percent;
-                entry.state.memory_usage_bytes = memory_usage_bytes;
+                entry.state.cpu_usage_percent = Some(metrics.root_cpu_percent);
+                entry.state.memory_usage_bytes = Some(metrics.root_memory_bytes);
+                entry.state.tree_cpu_usage_percent = Some(metrics.tree_cpu_percent);
+                entry.state.tree_memory_bytes = Some(metrics.tree_memory_bytes);
+                entry.state.process_count = Some(metrics.process_count);
                 entry.state.metrics_sampled_at_ms = Some(now_ms());
                 true
             } else {
@@ -1043,6 +1145,9 @@ impl ProcessManager {
             entry.state.started_at_ms = None;
             entry.state.cpu_usage_percent = None;
             entry.state.memory_usage_bytes = None;
+            entry.state.tree_cpu_usage_percent = None;
+            entry.state.tree_memory_bytes = None;
+            entry.state.process_count = None;
             entry.state.metrics_sampled_at_ms = None;
             let mut restart_delay_ms = None;
             if policy_allows {
@@ -1149,22 +1254,26 @@ impl ProcessManager {
             if !still_waiting {
                 return;
             }
-            let service = match app.try_state::<crate::AppState>() {
-                Some(state) => match state.database.lock() {
+            let reloaded = match app.try_state::<crate::AppState>() {
+                Some(state) => tokio::task::block_in_place(|| match state.database.lock() {
                     Ok(database) => match database.get_service(&id) {
-                        Ok(Some(service)) => service,
-                        Ok(None) => return,
+                        Ok(service) => Some(service),
                         Err(error) => {
                             log::warn!(
                                 "event=service_restart_reload_failed service_id={} error={}",
                                 id,
                                 error
                             );
-                            service
+                            None
                         }
                     },
-                    Err(_) => service,
-                },
+                    Err(_) => None,
+                }),
+                None => None,
+            };
+            let service = match reloaded {
+                Some(Some(service)) => service,
+                Some(None) => return,
                 None => service,
             };
             if !service.enabled {
@@ -2037,6 +2146,46 @@ mod tests {
     }
 
     #[test]
+    fn aggregates_process_tree_totals() {
+        let mut samples = HashMap::new();
+        samples.insert(
+            100,
+            ProcessSample {
+                parent: None,
+                cpu: 1.5,
+                memory: 100,
+            },
+        );
+        samples.insert(
+            101,
+            ProcessSample {
+                parent: Some(100),
+                cpu: 2.5,
+                memory: 200,
+            },
+        );
+        samples.insert(
+            102,
+            ProcessSample {
+                parent: Some(101),
+                cpu: 3.0,
+                memory: 300,
+            },
+        );
+        samples.insert(
+            200,
+            ProcessSample {
+                parent: None,
+                cpu: 9.0,
+                memory: 900,
+            },
+        );
+
+        assert_eq!(aggregate_tree(100, &samples), (7.0, 600, 3));
+        assert_eq!(aggregate_tree(999, &samples), (0.0, 0, 0));
+    }
+
+    #[test]
     fn log_chunks_keep_valid_utf8_boundaries() {
         let text = "a".repeat(16 * 1024 - 2) + "🌱tail";
         let bytes = text.as_bytes();
@@ -2408,7 +2557,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn stopping_a_service_clears_its_active_process_record() {
         let app = tauri::test::mock_app();
         let service = test_service("/bin/sh", &["-c", "exec sleep 30"]);
@@ -2449,7 +2598,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn manager_persists_completed_run_history() {
         let app = tauri::test::mock_app();
         let service = test_service("/bin/sh", &["-c", "exit 7"]);
@@ -2644,7 +2793,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn on_failure_restarts_until_the_attempt_limit_is_reached() {
         let app = tauri::test::mock_app();
         let mut service = test_service("/bin/sh", &["-c", "exit 3"]);

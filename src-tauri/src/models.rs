@@ -286,6 +286,12 @@ pub struct RuntimeState {
     pub started_at_ms: Option<u128>,
     pub cpu_usage_percent: Option<f32>,
     pub memory_usage_bytes: Option<u64>,
+    /// CPU usage summed across the root process and all its descendants.
+    pub tree_cpu_usage_percent: Option<f32>,
+    /// Resident memory summed across the root process and all its descendants.
+    pub tree_memory_bytes: Option<u64>,
+    /// Number of processes in the tree, including the root.
+    pub process_count: Option<u32>,
     pub metrics_sampled_at_ms: Option<u128>,
     /// `not_configured`, `starting`, `healthy`, or `unhealthy`.
     pub health: String,

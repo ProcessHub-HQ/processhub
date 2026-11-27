@@ -25,15 +25,15 @@ pub(crate) struct AppState {
 /// Clears bookkeeping for a process that already exited, or verifies and stops
 /// a process left behind by a previous ProcessHub session.
 async fn reconcile_active_process(state: &AppState, service_id: &str) -> Result<(), String> {
-    let record = {
+    let record = tokio::task::block_in_place(|| {
         let database = state
             .database
             .lock()
             .map_err(|_| "Database lock poisoned".to_string())?;
         database
             .get_active_process(service_id)
-            .map_err(|error| error.to_string())?
-    };
+            .map_err(|error| error.to_string())
+    })?;
     let Some(record) = record else {
         return Ok(());
     };
@@ -41,23 +41,27 @@ async fn reconcile_active_process(state: &AppState, service_id: &str) -> Result<
         if state.processes.is_running(service_id) {
             return Ok(());
         }
-        state
-            .database
-            .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?
-            .delete_active_process(service_id)
-            .map_err(|error| error.to_string())?;
-        return Ok(());
-    }
-    match process_manager::recover_orphaned_process(&record).await? {
-        process_manager::OrphanedProcessRecovery::Stopped
-        | process_manager::OrphanedProcessRecovery::AlreadyExited => {
+        tokio::task::block_in_place(|| {
             state
                 .database
                 .lock()
                 .map_err(|_| "Database lock poisoned".to_string())?
                 .delete_active_process(service_id)
-                .map_err(|error| error.to_string())?;
+                .map_err(|error| error.to_string())
+        })?;
+        return Ok(());
+    }
+    match process_manager::recover_orphaned_process(&record).await? {
+        process_manager::OrphanedProcessRecovery::Stopped
+        | process_manager::OrphanedProcessRecovery::AlreadyExited => {
+            tokio::task::block_in_place(|| {
+                state
+                    .database
+                    .lock()
+                    .map_err(|_| "Database lock poisoned".to_string())?
+                    .delete_active_process(service_id)
+                    .map_err(|error| error.to_string())
+            })?;
             Ok(())
         }
         process_manager::OrphanedProcessRecovery::Unverifiable => Err(format!(
@@ -70,17 +74,19 @@ async fn reconcile_active_process(state: &AppState, service_id: &str) -> Result<
 type ServiceGraph = (Vec<Service>, Vec<(String, String)>);
 
 fn service_graph(state: &AppState) -> Result<ServiceGraph, String> {
-    let database = state
-        .database
-        .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?;
-    let services = database
-        .list_services()
-        .map_err(|error| error.to_string())?;
-    let dependencies = database
-        .list_dependencies()
-        .map_err(|error| error.to_string())?;
-    Ok((services, dependencies))
+    tokio::task::block_in_place(|| {
+        let database = state
+            .database
+            .lock()
+            .map_err(|_| "Database lock poisoned".to_string())?;
+        let services = database
+            .list_services()
+            .map_err(|error| error.to_string())?;
+        let dependencies = database
+            .list_dependencies()
+            .map_err(|error| error.to_string())?;
+        Ok((services, dependencies))
+    })
 }
 
 fn validate_service_dependencies(state: &AppState, service: &Service) -> Result<(), String> {
@@ -350,7 +356,7 @@ async fn delete_service_from_state<R: Runtime>(
     if state.processes.is_running(&id) {
         state.processes.stop(&id, app).await?;
     }
-    let (deleted, service) = {
+    let (deleted, service) = tokio::task::block_in_place(|| {
         let mut database = state
             .database
             .lock()
@@ -361,8 +367,8 @@ async fn delete_service_from_state<R: Runtime>(
         let deleted = database
             .delete_service(&id)
             .map_err(|error| error.to_string())?;
-        (deleted, service)
-    };
+        Ok::<_, String>((deleted, service))
+    })?;
     if deleted && let Some(service) = service.as_ref() {
         for variable in service
             .environment
@@ -686,7 +692,7 @@ async fn restart_all_services(
 async fn recover_orphaned_services(
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let (records, names) = {
+    let (records, names) = tokio::task::block_in_place(|| {
         let database = state
             .database
             .lock()
@@ -697,13 +703,13 @@ async fn recover_orphaned_services(
             .into_iter()
             .map(|service| (service.id, service.name))
             .collect::<std::collections::HashMap<_, _>>();
-        (
+        Ok::<_, String>((
             database
                 .list_active_processes()
                 .map_err(|error| error.to_string())?,
             names,
-        )
-    };
+        ))
+    })?;
     let mut cleared = Vec::new();
     let mut unverifiable = Vec::new();
     let mut failures = Vec::new();
@@ -716,24 +722,28 @@ async fn recover_orphaned_services(
             if state.processes.is_running(&record.service_id) {
                 continue;
             }
-            state
-                .database
-                .lock()
-                .map_err(|_| "Database lock poisoned".to_string())?
-                .delete_active_process(&record.service_id)
-                .map_err(|error| error.to_string())?;
+            tokio::task::block_in_place(|| {
+                state
+                    .database
+                    .lock()
+                    .map_err(|_| "Database lock poisoned".to_string())?
+                    .delete_active_process(&record.service_id)
+                    .map_err(|error| error.to_string())
+            })?;
             cleared.push(name);
             continue;
         }
         match process_manager::recover_orphaned_process(&record).await {
             Ok(process_manager::OrphanedProcessRecovery::Stopped)
             | Ok(process_manager::OrphanedProcessRecovery::AlreadyExited) => {
-                state
-                    .database
-                    .lock()
-                    .map_err(|_| "Database lock poisoned".to_string())?
-                    .delete_active_process(&record.service_id)
-                    .map_err(|error| error.to_string())?;
+                tokio::task::block_in_place(|| {
+                    state
+                        .database
+                        .lock()
+                        .map_err(|_| "Database lock poisoned".to_string())?
+                        .delete_active_process(&record.service_id)
+                        .map_err(|error| error.to_string())
+                })?;
                 cleared.push(name);
             }
             Ok(process_manager::OrphanedProcessRecovery::Unverifiable) => unverifiable.push(name),
@@ -1105,13 +1115,15 @@ async fn get_service_logs(
     id: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<LogEvent>, String> {
-    let exists = state
-        .database
-        .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?
-        .get_service(&id)
-        .map_err(|error| error.to_string())?
-        .is_some();
+    let exists = tokio::task::block_in_place(|| {
+        state
+            .database
+            .lock()
+            .map_err(|_| "Database lock poisoned".to_string())?
+            .get_service(&id)
+            .map_err(|error| error.to_string())
+            .map(|service| service.is_some())
+    })?;
     if !exists {
         return Err("Service not found".into());
     }
@@ -1719,7 +1731,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn stale_same_session_records_are_cleared_without_signalling() {
         let app = tauri::test::mock_app();
         let service = Service::from_create(CreateService {
@@ -1782,7 +1794,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn unverifiable_previous_session_records_are_retained() {
         let app = tauri::test::mock_app();
         let service = Service::from_create(CreateService {
@@ -1844,7 +1856,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn deleting_a_running_service_stops_it_then_removes_its_configuration() {
         let app = tauri::test::mock_app();
         let handle = app.handle().clone();
@@ -1920,7 +1932,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn starting_a_service_starts_its_dependencies_first() {
         let app = tauri::test::mock_app();
         let handle = app.handle().clone();

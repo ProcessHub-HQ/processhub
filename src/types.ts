@@ -105,6 +105,9 @@ export interface RuntimeState {
   startedAtMs: number | null;
   cpuUsagePercent: number | null;
   memoryUsageBytes: number | null;
+  treeCpuUsagePercent: number | null;
+  treeMemoryBytes: number | null;
+  processCount: number | null;
   metricsSampledAtMs: number | null;
   health: HealthStatus;
   healthCheckedAtMs: number | null;

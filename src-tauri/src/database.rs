@@ -11,6 +11,9 @@ pub struct Database {
 impl Database {
     pub fn open(path: impl AsRef<Path>) -> rusqlite::Result<Self> {
         let connection = Connection::open(path)?;
+        connection.pragma_update(None, "journal_mode", "WAL")?;
+        connection.pragma_update(None, "synchronous", "NORMAL")?;
+        connection.pragma_update(None, "busy_timeout", 5000)?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let mut database = Self { connection };
         database.migrate()?;
@@ -666,6 +669,28 @@ mod tests {
             assert_eq!(services[0].environment[0].key, "MODE");
         }
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn wal_mode_and_busy_timeout_are_configured() {
+        let path =
+            std::env::temp_dir().join(format!("processhub-{}.sqlite3", uuid::Uuid::new_v4()));
+        {
+            let database = Database::open(&path).expect("open database");
+            let journal_mode: String = database
+                .connection
+                .pragma_query_value(None, "journal_mode", |row| row.get(0))
+                .expect("read journal mode");
+            assert_eq!(journal_mode, "wal");
+            let busy_timeout: i64 = database
+                .connection
+                .pragma_query_value(None, "busy_timeout", |row| row.get(0))
+                .expect("read busy timeout");
+            assert_eq!(busy_timeout, 5000);
+        }
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("sqlite3-wal"));
+        let _ = std::fs::remove_file(path.with_extension("sqlite3-shm"));
     }
 
     #[test]

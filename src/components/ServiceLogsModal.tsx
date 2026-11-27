@@ -154,13 +154,17 @@ export function ServiceLogsModal({
     return () => window.clearInterval(timer);
   }, [waitingToRestart]);
 
+  const cpuPercent = state?.treeCpuUsagePercent ?? state?.cpuUsagePercent;
+  const memoryBytes = state?.treeMemoryBytes ?? state?.memoryUsageBytes;
+  const processCount = state?.processCount;
+  const processMetrics = `${cpuPercent !== null && cpuPercent !== undefined ? ` · CPU ${cpuPercent.toFixed(1)}%` : ""}${memoryBytes !== null && memoryBytes !== undefined ? ` · ${formatMemory(memoryBytes)}` : ""}${processCount !== null && processCount !== undefined ? ` · ${processCount} ${processCount === 1 ? "process" : "processes"}` : ""}`;
   const processMeta = waitingToRestart
     ? `Restarting in ${Math.max(
         0,
         Math.ceil(((state?.restartAtMs ?? Date.now()) - Date.now()) / 1000),
       )}s · attempt ${state?.restartAttempt ?? 1}`
     : state?.pid
-      ? `PID ${state.pid}${state.startedAtMs ? ` · up ${formatUptime(state.startedAtMs)}` : ""}${state.cpuUsagePercent !== null && state.cpuUsagePercent !== undefined ? ` · CPU ${state.cpuUsagePercent.toFixed(1)}%` : ""}${state.memoryUsageBytes !== null && state.memoryUsageBytes !== undefined ? ` · ${formatMemory(state.memoryUsageBytes)}` : ""}`
+      ? `PID ${state.pid}${state.startedAtMs ? ` · up ${formatUptime(state.startedAtMs)}` : ""}${processMetrics}`
       : `${status.replace(/_/g, " ")}${state?.exitCode !== null && state?.exitCode !== undefined ? ` · exit ${state.exitCode}` : ""}`;
 
   const visibleEvents = paused ? (pausedEvents ?? events) : events;
@@ -253,10 +257,7 @@ export function ServiceLogsModal({
             {service.description && (
               <p className="details-description">{service.description}</p>
             )}
-            <p
-              className="details-runtime-meta"
-              title="CPU and memory are estimates for the root process only."
-            >
+            <p className="details-runtime-meta">
               {processMeta} · {visibleEvents.length} buffered events · max{" "}
               {service.logMaxSizeMb} MB/file
             </p>
