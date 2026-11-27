@@ -126,3 +126,7 @@ processhub/
 - **CPU & Memory metrics** are sampled once per second for the root process only and displayed as estimates; child processes are excluded.
 - **Windows crash recovery** currently uses `taskkill /T /F` with PID + start-time verification; descendants that outlive the root cannot be verified without Windows Job Objects (tracked as a follow-up in [docs/architecture.md](docs/architecture.md)).
 - **Secret environment variables** use the OS keychain (Keychain / Credential Manager / Secret Service). Removing a secret deletes its keychain entry.
+
+## License
+
+ProcessHub is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE).

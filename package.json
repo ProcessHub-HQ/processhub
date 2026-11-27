@@ -36,5 +36,6 @@
     "sharp": "^0.35.5",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
-  }
+  },
+  "license": "AGPL-3.0-or-later"
 }
