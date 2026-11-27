@@ -36,13 +36,15 @@ export function WorkspaceContent() {
       .includes(normalizedQuery),
   );
 
+  function isActive(service: Service) {
+    const status = runtime[service.id]?.status ?? "";
+    return ["running", "starting", "stopping", "waiting_to_restart"].includes(
+      status,
+    );
+  }
+
   function buildServiceMenuItems(service: Service): ContextMenuEntry[] {
-    const active = [
-      "running",
-      "starting",
-      "stopping",
-      "waiting_to_restart",
-    ].includes(runtime[service.id]?.status ?? "");
+    const active = isActive(service);
     return [
       { type: "heading", id: `heading-${service.id}`, label: service.name },
       {
@@ -82,10 +84,14 @@ export function WorkspaceContent() {
     ];
   }
 
+  function openServiceMenuAt(x: number, y: number, service: Service) {
+    setSelectedId(service.id);
+    openContextMenu({ clientX: x, clientY: y }, buildServiceMenuItems(service));
+  }
+
   function openServiceMenu(event: MouseEvent<HTMLElement>, service: Service) {
     event.preventDefault();
-    setSelectedId(service.id);
-    openContextMenu(event, buildServiceMenuItems(service));
+    openServiceMenuAt(event.clientX, event.clientY, service);
   }
 
   function openKeyboardMenu(
@@ -93,11 +99,7 @@ export function WorkspaceContent() {
     service: Service,
   ) {
     const bounds = event.currentTarget.getBoundingClientRect();
-    setSelectedId(service.id);
-    openContextMenu(
-      { clientX: bounds.left + 18, clientY: bounds.bottom - 10 },
-      buildServiceMenuItems(service),
-    );
+    openServiceMenuAt(bounds.left + 18, bounds.bottom - 10, service);
   }
 
   if (loading) {
@@ -147,6 +149,11 @@ export function WorkspaceContent() {
             setSelectedId(service.id);
             setLogServiceId(service.id);
           }}
+          onToggle={() => {
+            setSelectedId(service.id);
+            void runAction(service, isActive(service) ? "stop" : "start");
+          }}
+          onOpenMenu={(x, y) => openServiceMenuAt(x, y, service)}
           onContextMenu={(event) => openServiceMenu(event, service)}
           onKeyboardContextMenu={(event) => openKeyboardMenu(event, service)}
         />

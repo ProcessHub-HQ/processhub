@@ -295,35 +295,94 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
   align-content: start;
-  gap: 16px 12px;
+  gap: 14px 12px;
+}
+
+.process-card {
+  position: relative;
+  min-width: 0;
 }
 
 .process-item {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 156px;
+  height: 100%;
+  min-height: 124px;
   flex-direction: column;
-  align-items: center;
-  padding: 14px 10px 12px;
+  align-items: stretch;
+  padding: 12px;
   border: 1px solid var(--ph-color-card-border);
   border-radius: 12px;
   color: inherit;
   background: transparent;
-  text-align: center;
+  text-align: left;
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
 }
 
-.process-item:hover {
+.process-card:hover .process-item {
   border-color: var(--ph-color-card-border-hover);
   background: var(--ph-color-card-hover);
 }
 
-.process-item.selected {
+.process-item.selected,
+.process-card:hover .process-item.selected {
   border-color: var(--ph-color-selected-border);
   background: var(--ph-color-selected);
+}
+
+.process-card-actions {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+}
+
+.process-card-action {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ph-radius-sm);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.process-card-action:not(:disabled):hover {
+  color: var(--text);
+  background: var(--ph-color-hover);
+}
+
+.process-card-action:focus-visible {
+  outline: 2px solid var(--ph-color-accent);
+  outline-offset: 1px;
+}
+
+.process-card-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.process-card-action--primary {
+  opacity: 0.8;
+}
+
+.process-card-menu {
+  opacity: 0.6;
+}
+
+.process-card:hover .process-card-action--primary,
+.process-card:focus-within .process-card-action--primary,
+.process-card:hover .process-card-menu,
+.process-card:focus-within .process-card-menu {
+  opacity: 1;
 }
 
 .process-icon {
@@ -391,32 +450,53 @@ body {
 }
 
 .process-state-dot.starting,
-.process-state-dot.stopping {
+.process-state-dot.stopping,
+.process-state-dot.waiting_to_restart {
   background: var(--ph-color-status-warning);
+}
+
+.process-item .process-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  margin-bottom: 10px;
+  border-radius: var(--ph-radius-2xl);
+}
+
+.process-item .process-icon > svg {
+  width: 21px;
+  height: 21px;
+}
+
+.process-item .process-state-dot {
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
 }
 
 .process-name {
   display: -webkit-box;
-  max-width: 118px;
+  max-width: 100%;
   overflow: hidden;
   color: var(--ph-color-process-name);
-  font-size: 11.5px;
-  line-height: 1.35;
-  font-weight: 550;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .process-state {
-  max-width: 118px;
-  margin-top: 4px;
+  max-width: 100%;
+  margin-top: 2px;
   overflow: hidden;
-  color: var(--faint);
-  font-size: 9.5px;
-  line-height: 1.2;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 550;
+  line-height: 1.25;
   text-overflow: ellipsis;
-  text-transform: capitalize;
   white-space: nowrap;
 }
 
@@ -428,25 +508,23 @@ body {
   color: var(--ph-color-danger-text);
 }
 
-.process-pid {
-  margin-top: 3px;
+.process-state.starting,
+.process-state.stopping,
+.process-state.waiting_to_restart {
+  color: var(--ph-color-warning-text);
+}
+
+.process-meta {
+  width: 100%;
+  margin-top: 6px;
+  overflow: hidden;
   color: var(--faint);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
-}
-
-.context-hint {
-  position: absolute;
-  top: 4px;
-  right: 7px;
-  color: var(--faint);
-  opacity: 0;
-}
-
-.process-item:hover .context-hint,
-.process-item:focus-visible .context-hint {
-  opacity: 0.85;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-canvas,
