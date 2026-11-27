@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { StatusBar } from "../app/StatusBar";
 import { TopBar } from "../app/TopBar";
 
 interface AppShellProps {
@@ -12,6 +13,7 @@ export function AppShell({ children }: AppShellProps) {
       <section className="workspace" aria-label="Process workspace">
         {children}
       </section>
+      <StatusBar />
     </main>
   );
 }
