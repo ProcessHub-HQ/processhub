@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
+import { generateReleaseNotes, latestTag } from "./release-notes.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const PACKAGE_JSON_PATH = resolve(ROOT, "package.json");
@@ -161,6 +162,15 @@ function main() {
     ensureCleanWorkingTree();
   }
   ensureTagDoesNotExist(tag);
+
+  const previousTag = latestTag();
+  const notes = generateReleaseNotes({
+    from: previousTag,
+    to: "HEAD",
+  });
+  console.log("\nRelease notes preview:\n");
+  console.log(notes);
+  console.log("");
 
   const pkgChanged = updateJsonVersion(PACKAGE_JSON_PATH, nextVersion, dryRun);
   const tauriChanged = updateJsonVersion(TAURI_CONF_PATH, nextVersion, dryRun);
