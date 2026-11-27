@@ -1,20 +1,12 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to release (for example v2.3.3)"
-        required: true
-        type: string
-      draft:
-        description: "Create the GitHub release as a draft"
-        required: false
-        type: boolean
-        default: false
+  push:
+    tags:
+      - "v*"
 
 concurrency:
-  group: release-${{ github.event.inputs.tag }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -42,7 +34,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
@@ -89,7 +80,7 @@ jobs:
         shell: bash
         run: |
           git fetch --tags --force
-          node scripts/release-notes.mjs --tag "${{ inputs.tag }}" > "$RUNNER_TEMP/release-notes.md"
+          node scripts/release-notes.mjs --tag "${{ github.ref_name }}" > "$RUNNER_TEMP/release-notes.md"
           {
             echo 'body<<RELEASE_NOTES_EOF'
             cat "$RUNNER_TEMP/release-notes.md"
@@ -104,8 +95,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.args }}
-          tagName: ${{ inputs.tag }}
-          releaseName: "ProcessHub ${{ inputs.tag }}"
+          tagName: ${{ github.ref_name }}
+          releaseName: "ProcessHub ${{ github.ref_name }}"
           releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: ${{ inputs.draft }}
+          releaseDraft: false
           prerelease: false
