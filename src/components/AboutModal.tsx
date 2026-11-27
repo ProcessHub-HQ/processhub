@@ -8,7 +8,7 @@ interface AboutModalProps {
 
 export function AboutModal({
   onClose,
-  websiteUrl = "https://processhub-hq.github.io/processhub-site/",
+  websiteUrl = "https://processhub-hq.github.io/",
 }: AboutModalProps) {
   return (
     <Modal titleId="about-title" className="about-dialog" onClose={onClose}>
