@@ -166,7 +166,7 @@ pub fn friendly_error(message: &str, fallback: &str) -> String {
     for (needles, copy) in RULES {
         if needles
             .iter()
-            .any(|needle| contains_needle(&lower, *needle))
+            .any(|needle| contains_needle(&lower, needle))
         {
             log::warn!("event=raw_error original={original} friendly={copy}");
             return (*copy).to_string();
