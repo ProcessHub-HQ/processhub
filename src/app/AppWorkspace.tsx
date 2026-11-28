@@ -1,3 +1,4 @@
+import { IconButton } from "@processhub/design-system";
 import { X } from "lucide-react";
 import { useEffect } from "react";
 import { AppShell } from "../components/AppShell";
@@ -53,13 +54,9 @@ export function AppWorkspace() {
       {notice && (
         <div className="notice-banner" role="status">
           <span>{notice}</span>
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={() => setNotice(null)}
-          >
+          <IconButton size="xs" label="Dismiss" onClick={() => setNotice(null)}>
             <X size={13} />
-          </button>
+          </IconButton>
         </div>
       )}
       {view === "monitor" ? (

@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@processhub/design-system':
-        specifier: github:ProcessHub-HQ/processhub-design-system#v0.2.2
-        version: https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bedb02ca0a347835ca8b4121d40f1f98a7a23e1b(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        specifier: github:ProcessHub-HQ/processhub-design-system#v0.3.0
+        version: https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bacac6921f2b7fdfc2a06903bf8a4e2e06989f06(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tauri-apps/api':
         specifier: ^2
         version: 2.12.5
@@ -316,9 +316,9 @@ packages:
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
 
-  '@processhub/design-system@https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bedb02ca0a347835ca8b4121d40f1f98a7a23e1b':
-    resolution: {gitHosted: true, integrity: sha512-pf64DL1d0KRMntQLXt59TS5rFG7C9vSTkojyZZZzygZAItPWe9VTJ50RBrR+VUjUDJ1YfdspQp0fBxjWByvKZg==, tarball: https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bedb02ca0a347835ca8b4121d40f1f98a7a23e1b}
-    version: 0.2.2
+  '@processhub/design-system@https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bacac6921f2b7fdfc2a06903bf8a4e2e06989f06':
+    resolution: {gitHosted: true, integrity: sha512-xiCesKnE4OTwQ3QltCc3o2vHhbLL+ndOJWNlatud8hzEVdtCY9xEl4lphGz3uGdIfCwD2Z7h1FHk9gy4GRhDYA==, tarball: https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bacac6921f2b7fdfc2a06903bf8a4e2e06989f06}
+    version: 0.3.0
     peerDependencies:
       react: ^19.1.0
       react-dom: ^19.1.0
@@ -957,7 +957,7 @@ snapshots:
 
   '@oxc-project/types@0.156.0': {}
 
-  '@processhub/design-system@https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bedb02ca0a347835ca8b4121d40f1f98a7a23e1b(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+  '@processhub/design-system@https://codeload.github.com/ProcessHub-HQ/processhub-design-system/tar.gz/bacac6921f2b7fdfc2a06903bf8a4e2e06989f06(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)

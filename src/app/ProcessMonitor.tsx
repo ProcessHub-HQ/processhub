@@ -1,4 +1,4 @@
-import { Button } from "@processhub/design-system";
+import { Button, StatusDot } from "@processhub/design-system";
 import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { ServiceIcon } from "../components/ServiceIcon";
@@ -162,7 +162,7 @@ export function ProcessMonitor() {
           Memory <strong>{formatMemory(totalMemory)}</strong>
         </span>
         <span className="monitor-live">
-          <span className="status-dot running" aria-hidden="true" />
+          <StatusDot status="running" aria-hidden="true" />
           Live
         </span>
       </div>

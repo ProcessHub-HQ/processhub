@@ -1,7 +1,9 @@
+import { IconButton } from "@processhub/design-system";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ImagePlus, Upload, X } from "lucide-react";
 import { useState } from "react";
+import { friendlyError } from "../lib/errors";
 import { processHub } from "../lib/processhub";
 
 interface ImageInputProps {
@@ -32,7 +34,12 @@ export function ImageInput({
       const iconPath = await processHub.importServiceIcon(selected);
       onChange(iconPath);
     } catch (cause) {
-      onError?.(String(cause));
+      onError?.(
+        friendlyError(
+          cause,
+          "The icon couldn't be saved. Choose a PNG, JPEG, or WebP under 8 MB.",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -62,16 +69,16 @@ export function ImageInput({
           {value ? "Replace" : "Choose"}
         </button>
         {value && (
-          <button
-            type="button"
-            className="image-input-button remove"
-            aria-label="Remove image"
+          <IconButton
+            size="xs"
+            variant="danger"
+            label="Remove image"
             title="Remove image"
             disabled={busy}
             onClick={() => onChange(null)}
           >
             <X size={12} />
-          </button>
+          </IconButton>
         )}
       </div>
     </div>

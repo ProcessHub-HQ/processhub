@@ -1,7 +1,15 @@
-import { Button, Input, Modal, Textarea } from "@processhub/design-system";
+import {
+  Button,
+  Checkbox,
+  Input,
+  Modal,
+  Select,
+  Textarea,
+} from "@processhub/design-system";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { friendlyError } from "../lib/errors";
 import { newDraftId } from "../lib/ids";
 import type { ServiceDraft } from "../stores/servicesStore";
 import type { Service } from "../types";
@@ -105,7 +113,12 @@ export function ServiceFormModal({
       if (typeof selected === "string")
         setDraft((current) => ({ ...current, workingDirectory: selected }));
     } catch (cause) {
-      setFormError(String(cause));
+      setFormError(
+        friendlyError(
+          cause,
+          "The folder picker couldn't be opened. Try again.",
+        ),
+      );
     }
   }
 
@@ -242,23 +255,21 @@ export function ServiceFormModal({
               <section className="advanced-group">
                 <h3 className="form-section-title">Behavior</h3>
                 <div className="form-options">
-                  <label>
-                    Restart policy
-                    <select
-                      value={draft.restartPolicy}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          restartPolicy: event.target
-                            .value as ServiceDraft["restartPolicy"],
-                        })
-                      }
-                    >
-                      <option value="never">Never</option>
-                      <option value="on_failure">On failure</option>
-                      <option value="always">Always</option>
-                    </select>
-                  </label>
+                  <Select
+                    label="Restart policy"
+                    value={draft.restartPolicy}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        restartPolicy: event.target
+                          .value as ServiceDraft["restartPolicy"],
+                      })
+                    }
+                  >
+                    <option value="never">Never</option>
+                    <option value="on_failure">On failure</option>
+                    <option value="always">Always</option>
+                  </Select>
                   {draft.restartPolicy !== "never" && (
                     <Input
                       label="Restart delay (ms)"
@@ -323,26 +334,20 @@ export function ServiceFormModal({
                   />
                 </div>
                 <div className="form-toggles">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={draft.enabled}
-                      onChange={(event) =>
-                        setDraft({ ...draft, enabled: event.target.checked })
-                      }
-                    />{" "}
-                    Enabled
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={draft.autoStart}
-                      onChange={(event) =>
-                        setDraft({ ...draft, autoStart: event.target.checked })
-                      }
-                    />{" "}
-                    Start automatically
-                  </label>
+                  <Checkbox
+                    label="Enabled"
+                    checked={draft.enabled}
+                    onChange={(event) =>
+                      setDraft({ ...draft, enabled: event.target.checked })
+                    }
+                  />
+                  <Checkbox
+                    label="Start automatically"
+                    checked={draft.autoStart}
+                    onChange={(event) =>
+                      setDraft({ ...draft, autoStart: event.target.checked })
+                    }
+                  />
                 </div>
                 <p className="advanced-hint">
                   Auto-start runs this process when ProcessHub opens.
@@ -355,23 +360,22 @@ export function ServiceFormModal({
                     <span className="dependency-list-label">Start after</span>
                     <div className="dependency-options">
                       {dependencyOptions.map((item) => (
-                        <label key={item.id} className="dependency-option">
-                          <input
-                            type="checkbox"
-                            checked={draft.dependsOn.includes(item.id)}
-                            onChange={(event) =>
-                              setDraft({
-                                ...draft,
-                                dependsOn: event.target.checked
-                                  ? [...draft.dependsOn, item.id]
-                                  : draft.dependsOn.filter(
-                                      (id) => id !== item.id,
-                                    ),
-                              })
-                            }
-                          />
-                          {item.name}
-                        </label>
+                        <Checkbox
+                          key={item.id}
+                          className="dependency-option"
+                          label={item.name}
+                          checked={draft.dependsOn.includes(item.id)}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              dependsOn: event.target.checked
+                                ? [...draft.dependsOn, item.id]
+                                : draft.dependsOn.filter(
+                                    (id) => id !== item.id,
+                                  ),
+                            })
+                          }
+                        />
                       ))}
                     </div>
                   </div>
@@ -380,23 +384,21 @@ export function ServiceFormModal({
               <section className="advanced-group">
                 <h3 className="form-section-title">Health check</h3>
                 <div className="form-options">
-                  <label>
-                    Check
-                    <select
-                      value={draft.healthCheckType}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          healthCheckType: event.target
-                            .value as ServiceDraft["healthCheckType"],
-                        })
-                      }
-                    >
-                      <option value="none">Not configured</option>
-                      <option value="tcp">TCP port</option>
-                      <option value="http">HTTP URL</option>
-                    </select>
-                  </label>
+                  <Select
+                    label="Check"
+                    value={draft.healthCheckType}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        healthCheckType: event.target
+                          .value as ServiceDraft["healthCheckType"],
+                      })
+                    }
+                  >
+                    <option value="none">Not configured</option>
+                    <option value="tcp">TCP port</option>
+                    <option value="http">HTTP URL</option>
+                  </Select>
                   {draft.healthCheckType !== "none" && (
                     <Input
                       label={

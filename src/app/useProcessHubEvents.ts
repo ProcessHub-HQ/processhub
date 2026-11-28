@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect } from "react";
+import { friendlyError, friendlyFailures } from "../lib/errors";
 import { processHubEvents } from "../lib/events";
 import { processHub } from "../lib/processhub";
 import { useLogsStore } from "../stores/logsStore";
@@ -65,7 +66,7 @@ export function useProcessHubEvents() {
             useUiStore
               .getState()
               .setLifecycleError(
-                `Started ${payload.started.length} service(s); ${payload.failures.length} failed: ${payload.failures.join("; ")}`,
+                `Started ${payload.started.length} service(s); ${friendlyFailures(payload.failures, "start")}`,
               );
           }
         },
@@ -79,17 +80,25 @@ export function useProcessHubEvents() {
       }),
       listen<string>("tray-open-url", ({ payload }) => {
         void openUrl(payload).catch((cause: unknown) =>
-          useUiStore.getState().setLifecycleError(String(cause)),
+          useUiStore
+            .getState()
+            .setLifecycleError(
+              friendlyError(cause, "The link couldn't be opened."),
+            ),
         );
       }),
       listen<{ action: string; failures: string[] }>(
         "tray-action-report",
         ({ payload }) => {
+          const action =
+            payload.action === "start" || payload.action === "restart"
+              ? payload.action
+              : "stop";
           useUiStore
             .getState()
             .setLifecycleError(
               payload.failures.length
-                ? `Some services could not be stopped: ${payload.failures.join("; ")}`
+                ? friendlyFailures(payload.failures, action)
                 : null,
             );
         },
@@ -125,7 +134,14 @@ export function useProcessHubEvents() {
           }
         })
         .catch((cause: unknown) =>
-          useUiStore.getState().setLifecycleError(String(cause)),
+          useUiStore
+            .getState()
+            .setLifecycleError(
+              friendlyError(
+                cause,
+                "ProcessHub couldn't recover running services. Try again.",
+              ),
+            ),
         );
       return stops;
     });

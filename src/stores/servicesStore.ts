@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { friendlyError } from "../lib/errors";
 import { processHub } from "../lib/processhub";
 import type {
   CreateService,
@@ -86,7 +87,12 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
         ),
       });
     } catch (cause) {
-      set({ error: String(cause) });
+      set({
+        error: friendlyError(
+          cause,
+          "ProcessHub couldn't load your services. Try again.",
+        ),
+      });
     } finally {
       set({ loading: false });
     }
@@ -104,7 +110,13 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
       if (action === "stop") await processHub.stopService(service.id);
       if (action === "restart") await processHub.restartService(service.id);
     } catch (cause) {
-      set({ error: String(cause) });
+      const fallback =
+        action === "start"
+          ? "The service couldn't start. Check the executable, arguments, and working directory."
+          : action === "stop"
+            ? "The service couldn't stop. Try again."
+            : "The service couldn't restart. Try again.";
+      set({ error: friendlyError(cause, fallback) });
     } finally {
       set({ busy: null });
     }
@@ -231,7 +243,12 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
       await get().refresh();
       return true;
     } catch (cause) {
-      set({ error: String(cause) });
+      set({
+        error: friendlyError(
+          cause,
+          "ProcessHub couldn't save this service. Try again.",
+        ),
+      });
       return false;
     } finally {
       set({ busy: null });
@@ -245,7 +262,12 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
       await get().refresh();
       return true;
     } catch (cause) {
-      set({ error: String(cause) });
+      set({
+        error: friendlyError(
+          cause,
+          "ProcessHub couldn't delete this service. Try again.",
+        ),
+      });
       return false;
     }
   },

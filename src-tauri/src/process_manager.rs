@@ -396,6 +396,10 @@ impl ProcessManager {
         let resolved_secrets = match resolved_secrets {
             Ok(values) => values,
             Err(error) => {
+                let friendly = crate::error_copy::friendly_error(
+                    &error,
+                    "The secret couldn't be saved to the system keychain. Try again.",
+                );
                 self.set_state(
                     RuntimeState {
                         service_id: service.id.clone(),
@@ -416,11 +420,11 @@ impl ProcessManager {
                         detected_url: None,
                         restart_at_ms: None,
                         restart_attempt: None,
-                        error: Some(error.clone()),
+                        error: Some(friendly.clone()),
                     },
                     &app,
                 )?;
-                return Err(error);
+                return Err(friendly);
             }
         };
         command.envs(
@@ -453,6 +457,10 @@ impl ProcessManager {
                     service.id,
                     error
                 );
+                let friendly = crate::error_copy::friendly_error(
+                    &error.to_string(),
+                    "The service couldn't start. Check the executable, arguments, and working directory.",
+                );
                 let state = RuntimeState {
                     service_id: service.id.clone(),
                     status: "failed".into(),
@@ -472,10 +480,10 @@ impl ProcessManager {
                     detected_url: None,
                     restart_at_ms: None,
                     restart_attempt: None,
-                    error: Some(error.to_string()),
+                    error: Some(friendly.clone()),
                 };
                 self.set_state(state, &app)?;
-                return Err(error.to_string());
+                return Err(friendly);
             }
         };
         let pid = child
@@ -515,6 +523,10 @@ impl ProcessManager {
             if let Err(error) = save_result {
                 terminate_tree(pid, true).await;
                 let _ = child.wait().await;
+                let friendly = crate::error_copy::friendly_error(
+                    &error,
+                    "ProcessHub couldn't save this service. Try again.",
+                );
                 self.set_state(
                     RuntimeState {
                         service_id: service.id.clone(),
@@ -535,11 +547,11 @@ impl ProcessManager {
                         detected_url: None,
                         restart_at_ms: None,
                         restart_attempt: None,
-                        error: Some(error.clone()),
+                        error: Some(friendly.clone()),
                     },
                     &app,
                 )?;
-                return Err(format!("Could not record the running process: {error}"));
+                return Err(format!("Could not record the running process: {friendly}"));
             }
         }
         let started_at_ms = now_ms();
@@ -689,7 +701,14 @@ impl ProcessManager {
                             let (health, error, latency) = match result {
                                 Ok(latency) => ("healthy".to_string(), None, Some(latency)),
                                 Err(_) if in_start_period => ("starting".to_string(), None, None),
-                                Err(error) => ("unhealthy".to_string(), Some(error), None),
+                                Err(error) => (
+                                    "unhealthy".to_string(),
+                                    Some(crate::error_copy::friendly_error(
+                                        &error,
+                                        "The health check couldn't reach the service. It may still be starting.",
+                                    )),
+                                    None,
+                                ),
                             };
                             if !health_manager.set_health(
                                 &health_service.id,
@@ -749,6 +768,12 @@ impl ProcessManager {
                 }
             };
             drop(log_tx);
+            let wait_error = wait_error.map(|error| {
+                crate::error_copy::friendly_error(
+                    &error,
+                    "The service exited unexpectedly. Check its logs.",
+                )
+            });
             let status = if wait_error.is_some() {
                 "failed"
             } else if user_stopped {
@@ -812,11 +837,19 @@ impl ProcessManager {
             manager.emit_lifecycle_state(&service_id, &app);
             let failed = outcome.status == "failed" || !matches!(exit_code, Some(0));
             if outcome.restart_delay_ms.is_none() && outcome.status != "stopped" && failed {
-                let detail = wait_error.clone().unwrap_or_else(|| {
-                    exit_code
-                        .map(|code| format!("exited with code {code}"))
-                        .unwrap_or_else(|| "process exited unexpectedly".into())
-                });
+                let detail = wait_error
+                    .clone()
+                    .map(|error| {
+                        crate::error_copy::friendly_error(
+                            &error,
+                            "The service exited unexpectedly. Check its logs.",
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        exit_code
+                            .map(|code| format!("exited with code {code}"))
+                            .unwrap_or_else(|| "process exited unexpectedly".into())
+                    });
                 crate::notify_if_hidden(
                     &app,
                     "Service failed",
@@ -1195,7 +1228,15 @@ impl ProcessManager {
                 if limit.is_some_and(|max| next_attempt > max) {
                     let suffix = error
                         .as_deref()
-                        .map(|error| format!(": {error}"))
+                        .map(|error| {
+                            format!(
+                                ": {}",
+                                crate::error_copy::friendly_error(
+                                    error,
+                                    "The service exited unexpectedly. Check its logs.",
+                                )
+                            )
+                        })
                         .unwrap_or_default();
                     entry.state.status = "failed".into();
                     entry.state.exit_code = exit_code;
@@ -3161,7 +3202,7 @@ mod tests {
             state
                 .health_error
                 .as_deref()
-                .is_some_and(|error| error.contains("TCP check failed"))
+                .is_some_and(|error| error.contains("refused the connection"))
         );
 
         manager.stop(&id, &handle).await.expect("stop process");

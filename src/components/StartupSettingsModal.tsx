@@ -1,5 +1,6 @@
 import { Button, Modal } from "@processhub/design-system";
 import { useEffect, useState } from "react";
+import { friendlyError } from "../lib/errors";
 import { processHub } from "../lib/processhub";
 
 const preferences = [
@@ -57,7 +58,14 @@ export function StartupSettingsModal({ onClose }: StartupSettingsModalProps) {
         if (active) setValues(Object.fromEntries(entries) as PreferenceValues);
       })
       .catch((cause: unknown) => {
-        if (active) setError(String(cause));
+        if (active) {
+          setError(
+            friendlyError(
+              cause,
+              "ProcessHub couldn't load your settings. Try again.",
+            ),
+          );
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -73,7 +81,9 @@ export function StartupSettingsModal({ onClose }: StartupSettingsModalProps) {
       await processHub.setSetting(key, value);
       setValues((current) => ({ ...current, [key]: value }));
     } catch (cause) {
-      setError(String(cause));
+      setError(
+        friendlyError(cause, "That setting couldn't be saved. Try again."),
+      );
     }
   }
 

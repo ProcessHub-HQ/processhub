@@ -3,6 +3,8 @@ import {
   type BadgeVariant,
   Button,
   Modal,
+  SearchField,
+  Select,
 } from "@processhub/design-system";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -25,6 +27,7 @@ import {
   useState,
 } from "react";
 import { parseAnsi } from "../lib/ansi";
+import { friendlyError } from "../lib/errors";
 import type {
   HealthStatus,
   LogEvent,
@@ -161,10 +164,23 @@ export function ServiceLogsModal({
   const { openContextMenu } = useGlobalContextMenu();
 
   useEffect(() => {
-    void onLoad(service.id).catch(() =>
-      setLoadError("Saved log history could not be loaded."),
+    void onLoad(service.id).catch((cause: unknown) =>
+      setLoadError(
+        friendlyError(cause, "The saved logs couldn't be loaded. Try again."),
+      ),
     );
   }, [onLoad, service.id]);
+
+  const healthError = useMemo(
+    () =>
+      state?.healthError
+        ? friendlyError(
+            state.healthError,
+            "The health check failed. It may still be starting.",
+          )
+        : null,
+    [state?.healthError],
+  );
 
   const status = state?.status ?? "stopped";
   const active = [
@@ -280,7 +296,7 @@ export function ServiceLogsModal({
                 <Badge
                   size="sm"
                   variant={healthBadgeVariant(state.health)}
-                  title={state.healthError ?? "Health check"}
+                  title={healthError ?? "Health check"}
                 >
                   {state.health}
                 </Badge>
@@ -293,9 +309,9 @@ export function ServiceLogsModal({
               {processMeta} · {visibleEvents.length} buffered events · max{" "}
               {service.logMaxSizeMb} MB/file
             </p>
-            {state?.healthError && (
+            {healthError && (
               <p className="details-health-error" role="status">
-                {state.healthError}
+                {healthError}
               </p>
             )}
           </div>
@@ -383,12 +399,13 @@ export function ServiceLogsModal({
       </details>
 
       <div className="log-toolbar">
-        <input
-          type="search"
-          aria-label="Search loaded logs"
+        <SearchField
+          size="sm"
+          label="Search loaded logs"
           placeholder="Search loaded logs…"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onClear={() => setQuery("")}
         />
         <Button
           size="xs"
@@ -403,26 +420,25 @@ export function ServiceLogsModal({
         <Button size="xs" onClick={() => setAutoScroll((current) => !current)}>
           Follow: {autoScroll ? "On" : "Off"}
         </Button>
-        <label className="log-retention">
-          Keep
-          <select
-            aria-label="Log retention period"
-            title="Expired files are removed the next time this service starts."
-            value={retentionDays}
-            onChange={(event) => {
-              setRetentionError(null);
-              void onRetentionChange(Number(event.target.value)).catch(() =>
-                setRetentionError("Could not save the log retention setting."),
-              );
-            }}
-          >
-            {[7, 14, 30, 90].map((days) => (
-              <option key={days} value={days}>
-                {days} days
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          className="log-retention"
+          label="Keep"
+          aria-label="Log retention period"
+          title="Expired files are removed the next time this service starts."
+          value={retentionDays}
+          onChange={(event) => {
+            setRetentionError(null);
+            void onRetentionChange(Number(event.target.value)).catch(() =>
+              setRetentionError("Could not save the log retention setting."),
+            );
+          }}
+        >
+          {[7, 14, 30, 90].map((days) => (
+            <option key={days} value={days}>
+              {days} days
+            </option>
+          ))}
+        </Select>
         <Button size="xs" onClick={onClear}>
           Clear view
         </Button>

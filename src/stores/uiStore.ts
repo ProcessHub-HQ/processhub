@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { friendlyError } from "../lib/errors";
 import { processHub } from "../lib/processhub";
 import type {
   Service,
@@ -135,7 +136,10 @@ export const useUiStore = create<UiState>((set, get) => ({
     } catch (cause) {
       set({
         updatePhase: "error",
-        updateError: String(cause),
+        updateError: friendlyError(
+          cause,
+          "Couldn't check for updates. Try again.",
+        ),
       });
     } finally {
       set({ checkingForUpdates: false });
@@ -191,7 +195,10 @@ export const useUiStore = create<UiState>((set, get) => ({
     } catch (cause) {
       set({
         updatePhase: "error",
-        updateError: String(cause),
+        updateError: friendlyError(
+          cause,
+          "The update couldn't be installed. Try again or download it from GitHub.",
+        ),
         updateProgress: null,
       });
     }

@@ -1,5 +1,6 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useCallback } from "react";
+import { friendlyError, friendlyFailures } from "../lib/errors";
 import { processHub } from "../lib/processhub";
 import { useServicesStore } from "../stores/servicesStore";
 import { useUiStore } from "../stores/uiStore";
@@ -13,9 +14,7 @@ export function useAppCommands() {
         if (action === "stop") {
           const failures = await processHub.stopAllServices();
           if (failures.length > 0) {
-            ui.setLifecycleError(
-              `Some services could not be stopped: ${failures.join("; ")}`,
-            );
+            ui.setLifecycleError(friendlyFailures(failures, "stop"));
           }
         } else {
           const report =
@@ -24,13 +23,19 @@ export function useAppCommands() {
               : await processHub.restartAllServices();
           if (report.failures.length > 0) {
             ui.setLifecycleError(
-              `Started ${report.started.length} service(s); ${report.failures.length} failed: ${report.failures.join("; ")}`,
+              `Started ${report.started.length} service(s); ${friendlyFailures(report.failures, action)}`,
             );
           }
         }
         await useServicesStore.getState().refresh();
       } catch (cause) {
-        useUiStore.getState().setLifecycleError(String(cause));
+        const fallback =
+          action === "start"
+            ? "Services couldn't start. Check their logs for details."
+            : action === "stop"
+              ? "Services couldn't stop. Check their logs for details."
+              : "Services couldn't restart. Check their logs for details.";
+        useUiStore.getState().setLifecycleError(friendlyError(cause, fallback));
       }
     },
     [],
@@ -48,7 +53,14 @@ export function useAppCommands() {
       await processHub.exportConfigurationTo(path);
       useUiStore.getState().setNotice("Configuration exported.");
     } catch (cause) {
-      useUiStore.getState().setLifecycleError(String(cause));
+      useUiStore
+        .getState()
+        .setLifecycleError(
+          friendlyError(
+            cause,
+            "The configuration couldn't be exported. Choose another location and try again.",
+          ),
+        );
     }
   }, []);
 
@@ -75,7 +87,14 @@ export function useAppCommands() {
         .getState()
         .setNotice(`Imported ${report.importedServices} service(s).${detail}`);
     } catch (cause) {
-      useUiStore.getState().setLifecycleError(String(cause));
+      useUiStore
+        .getState()
+        .setLifecycleError(
+          friendlyError(
+            cause,
+            "That configuration couldn't be imported. Check the file and try again.",
+          ),
+        );
     }
   }, []);
 

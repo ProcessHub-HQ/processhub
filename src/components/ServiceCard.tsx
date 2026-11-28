@@ -1,3 +1,4 @@
+import { IconButton } from "@processhub/design-system";
 import { LoaderCircle, MoreHorizontal, Play, Square } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import type { RuntimeState, RuntimeStatus, Service } from "../types";
@@ -111,10 +112,10 @@ export function ServiceCard({
         <span className="process-meta">{meta}</span>
       </Card>
       <div className="process-card-actions">
-        <button
-          type="button"
+        <IconButton
+          size="xs"
           className="process-card-action process-card-action--primary"
-          aria-label={active ? `Stop ${service.name}` : `Start ${service.name}`}
+          label={active ? `Stop ${service.name}` : `Start ${service.name}`}
           title={active ? "Stop" : "Start"}
           disabled={busy}
           onClick={onToggle}
@@ -126,11 +127,11 @@ export function ServiceCard({
           ) : (
             <Play size={12} strokeWidth={2.2} />
           )}
-        </button>
-        <button
-          type="button"
+        </IconButton>
+        <IconButton
+          size="xs"
           className="process-card-action process-card-menu"
-          aria-label={`More actions for ${service.name}`}
+          label={`More actions for ${service.name}`}
           title="More actions"
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
@@ -138,7 +139,7 @@ export function ServiceCard({
           }}
         >
           <MoreHorizontal size={14} />
-        </button>
+        </IconButton>
       </div>
     </div>
   );

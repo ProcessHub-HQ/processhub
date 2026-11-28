@@ -1,4 +1,4 @@
-import { Button } from "@processhub/design-system";
+import { Button, IconButton } from "@processhub/design-system";
 import { Plus, X } from "lucide-react";
 import { newDraftId } from "../lib/ids";
 import type { SecretDraft } from "../types";
@@ -46,17 +46,18 @@ export function SecretEditor({ secrets, onChange }: SecretEditorProps) {
               )
             }
           />
-          <button
-            type="button"
-            className="image-input-button remove"
-            aria-label={`Remove ${secret.key || "secret"}`}
+          <IconButton
+            size="xs"
+            variant="danger"
+            className="secret-remove"
+            label={`Remove ${secret.key || "secret"}`}
             title="Remove secret"
             onClick={() =>
               onChange(secrets.filter((_, itemIndex) => itemIndex !== index))
             }
           >
             <X size={12} />
-          </button>
+          </IconButton>
         </div>
       ))}
       <Button

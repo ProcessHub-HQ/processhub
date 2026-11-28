@@ -5,6 +5,7 @@ import { ServiceFormModal } from "../components/ServiceFormModal";
 import { ServiceLogsModal } from "../components/ServiceLogsModal";
 import { StartupSettingsModal } from "../components/StartupSettingsModal";
 import { UpdateDialog } from "../components/UpdateDialog";
+import { friendlyError } from "../lib/errors";
 import { processHub } from "../lib/processhub";
 import { useLogsStore } from "../stores/logsStore";
 import { useServicesStore } from "../stores/servicesStore";
@@ -82,7 +83,14 @@ export function AppDialogs() {
                 setLifecycleError(null);
                 void processHub
                   .quitApplication()
-                  .catch((cause: unknown) => setLifecycleError(String(cause)));
+                  .catch((cause: unknown) =>
+                    setLifecycleError(
+                      friendlyError(
+                        cause,
+                        "ProcessHub couldn't quit. Try again.",
+                      ),
+                    ),
+                  );
               }}
             >
               Stop &amp; Quit

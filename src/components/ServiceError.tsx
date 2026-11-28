@@ -1,3 +1,4 @@
+import { IconButton } from "@processhub/design-system";
 import { X } from "lucide-react";
 
 interface ServiceErrorProps {
@@ -19,14 +20,14 @@ export function ServiceError({
           Retry
         </button>
       )}
-      <button
-        className="error-close"
-        type="button"
-        aria-label="Dismiss error"
+      <IconButton
+        size="xs"
+        variant="danger"
+        label="Dismiss error"
         onClick={onDismiss}
       >
         <X size={14} />
-      </button>
+      </IconButton>
     </div>
   );
 }

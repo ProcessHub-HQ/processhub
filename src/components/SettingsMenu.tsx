@@ -1,4 +1,9 @@
-import { Button } from "@processhub/design-system";
+import {
+  IconButton,
+  Menu,
+  MenuItem,
+  MenuSeparator,
+} from "@processhub/design-system";
 import {
   ArrowUpCircle,
   Download,
@@ -64,75 +69,62 @@ export function SettingsMenu({
 
   return (
     <>
-      <Button
-        size="xs"
-        variant="icon"
+      <IconButton
+        size="sm"
         data-settings-trigger=""
-        className={open ? "active" : ""}
-        aria-label="Settings"
+        active={open}
+        label="Settings"
         aria-expanded={open}
         title="Settings"
-        icon={<Settings size={17} strokeWidth={1.8} />}
         onClick={() => onOpenChange(!open)}
-      />
+      >
+        <Settings size={17} strokeWidth={1.8} />
+      </IconButton>
       {open && (
-        <div
-          className="context-menu settings-popover"
+        <Menu
+          className="settings-popover"
           data-settings-menu=""
-          role="menu"
           aria-label="Settings"
         >
-          <button type="button" role="menuitem" onClick={onStartupSettings}>
-            <Settings2 size={14} />
-            <span>Startup settings</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
+          <MenuItem icon={<Settings2 size={14} />} onSelect={onStartupSettings}>
+            Startup settings
+          </MenuItem>
+          <MenuItem
+            icon={
+              checkingUpdates ? (
+                <RefreshCw className="is-spinning" size={14} />
+              ) : updateVersion ? (
+                <ArrowUpCircle size={14} />
+              ) : (
+                <RefreshCw size={14} />
+              )
+            }
             aria-busy={checkingUpdates}
             disabled={checkingUpdates}
-            onClick={onCheckUpdates}
+            onSelect={onCheckUpdates}
           >
-            {checkingUpdates ? (
-              <RefreshCw className="is-spinning" size={14} />
-            ) : updateVersion ? (
-              <ArrowUpCircle size={14} />
-            ) : (
-              <RefreshCw size={14} />
-            )}
-            <span>
-              {checkingUpdates
-                ? "Checking for updates…"
-                : updateVersion
-                  ? `Update to v${updateVersion}…`
-                  : "Check for updates…"}
-            </span>
-          </button>
-          <div className="menu-rule" />
-          <button type="button" role="menuitem" onClick={onExport}>
-            <Download size={14} />
-            <span>Export configuration…</span>
-          </button>
-          <button type="button" role="menuitem" onClick={onImport}>
-            <Upload size={14} />
-            <span>Import configuration…</span>
-          </button>
-          <div className="menu-rule" />
-          <button type="button" role="menuitem" onClick={onAbout}>
-            <Info size={14} />
-            <span>About</span>
-          </button>
-          <div className="menu-rule" />
-          <button
-            className="danger-item"
-            type="button"
-            role="menuitem"
-            onClick={onQuit}
-          >
-            <PowerIcon size={14} />
-            <span>Quit</span>
-          </button>
-        </div>
+            {checkingUpdates
+              ? "Checking for updates…"
+              : updateVersion
+                ? `Update to v${updateVersion}…`
+                : "Check for updates…"}
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem icon={<Download size={14} />} onSelect={onExport}>
+            Export configuration…
+          </MenuItem>
+          <MenuItem icon={<Upload size={14} />} onSelect={onImport}>
+            Import configuration…
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem icon={<Info size={14} />} onSelect={onAbout}>
+            About
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem danger icon={<PowerIcon size={14} />} onSelect={onQuit}>
+            Quit
+          </MenuItem>
+        </Menu>
       )}
     </>
   );

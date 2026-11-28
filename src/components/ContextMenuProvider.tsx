@@ -1,3 +1,9 @@
+import {
+  Menu,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+} from "@processhub/design-system";
 import { Copy, Scissors, TextSelect } from "lucide-react";
 import {
   createContext,
@@ -284,40 +290,31 @@ export function ContextMenuProvider({
           ref={menuRef}
           className="context-menu"
           data-context-menu=""
-          role="menu"
           style={{ left: position.left, top: position.top }}
         >
-          {menu.items.map((entry) => {
-            if (entry.type === "separator") {
-              return <div key={entry.id} className="menu-rule" />;
-            }
-            if (entry.type === "heading") {
+          <Menu>
+            {menu.items.map((entry) => {
+              if (entry.type === "separator") {
+                return <MenuSeparator key={entry.id} />;
+              }
+              if (entry.type === "heading") {
+                return <MenuLabel key={entry.id}>{entry.label}</MenuLabel>;
+              }
               return (
-                <div key={entry.id} className="context-heading">
+                <MenuItem
+                  key={entry.id}
+                  icon={entry.icon}
+                  shortcut={entry.shortcut}
+                  danger={entry.danger}
+                  disabled={entry.disabled}
+                  onClick={closeContextMenu}
+                  onSelect={entry.onSelect}
+                >
                   {entry.label}
-                </div>
+                </MenuItem>
               );
-            }
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                role="menuitem"
-                disabled={entry.disabled}
-                className={entry.danger ? "danger-item" : undefined}
-                onClick={() => {
-                  closeContextMenu();
-                  void entry.onSelect();
-                }}
-              >
-                {entry.icon}
-                <span>{entry.label}</span>
-                {entry.shortcut && (
-                  <span className="menu-shortcut">{entry.shortcut}</span>
-                )}
-              </button>
-            );
-          })}
+            })}
+          </Menu>
         </div>
       )}
     </ContextMenuContext.Provider>

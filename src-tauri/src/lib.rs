@@ -1,5 +1,6 @@
 mod database;
 mod dependencies;
+mod error_copy;
 mod models;
 mod process_manager;
 
@@ -16,8 +17,32 @@ use tauri::{Emitter, Manager, Runtime};
 use tauri_plugin_notification::NotificationExt;
 
 use database::Database;
+use error_copy::friendly_error;
 use models::{CreateService, LogEvent, RunHistory, Service};
 use process_manager::ProcessManager;
+
+const LOAD_SERVICES_FALLBACK: &str = "ProcessHub couldn't load your services. Try again.";
+const START_SERVICE_FALLBACK: &str =
+    "The service couldn't start. Check the executable, arguments, and working directory.";
+const STOP_SERVICE_FALLBACK: &str = "The service couldn't stop. Try again.";
+const RESTART_SERVICE_FALLBACK: &str = "The service couldn't restart. Try again.";
+const SAVE_SERVICE_FALLBACK: &str = "ProcessHub couldn't save this service. Try again.";
+const DELETE_SERVICE_FALLBACK: &str = "ProcessHub couldn't delete this service. Try again.";
+const IMPORT_CONFIGURATION_FALLBACK: &str =
+    "That configuration couldn't be imported. Check the file and try again.";
+const EXPORT_CONFIGURATION_FALLBACK: &str =
+    "The configuration couldn't be exported. Choose another location and try again.";
+const SAVE_SETTING_FALLBACK: &str = "That setting couldn't be saved. Try again.";
+const SAVE_ICON_FALLBACK: &str =
+    "The icon couldn't be saved. Choose a PNG, JPEG, or WebP under 8 MB.";
+const SAVE_SECRET_FALLBACK: &str =
+    "The secret couldn't be saved to the system keychain. Try again.";
+const LOAD_LOGS_FALLBACK: &str = "The saved logs couldn't be loaded. Try again.";
+const QUIT_FALLBACK: &str = "ProcessHub couldn't quit. Try again.";
+
+fn service_failure(name: &str, error: &str, fallback: &str) -> String {
+    format!("{name}: {}", friendly_error(error, fallback))
+}
 
 pub(crate) struct AppState {
     pub(crate) database: Mutex<Database>,
@@ -91,13 +116,13 @@ fn service_graph(state: &AppState) -> Result<ServiceGraph, String> {
         let database = state
             .database
             .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?;
         let services = database
             .list_services()
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?;
         let dependencies = database
             .list_dependencies()
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?;
         Ok((services, dependencies))
     })
 }
@@ -107,16 +132,16 @@ fn validate_service_dependencies(state: &AppState, service: &Service) -> Result<
         let database = state
             .database
             .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?;
         let known = database
             .list_services()
-            .map_err(|error| error.to_string())?
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?
             .into_iter()
             .map(|service| service.id)
             .collect::<HashSet<_>>();
         let edges = database
             .list_dependencies()
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?;
         (known, edges)
     };
     dependencies::validate_graph(&service.id, &service.depends_on, &known, &edges)
@@ -226,24 +251,25 @@ fn set_service_secret(
     let mut database = state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), SAVE_SECRET_FALLBACK))?;
     if database
         .get_service(&service_id)
-        .map_err(|error| error.to_string())?
+        .map_err(|error| friendly_error(&error.to_string(), SAVE_SECRET_FALLBACK))?
         .is_none()
     {
         return Err("Service not found".into());
     }
-    store_secret(&service_id, &key, &value)?;
+    store_secret(&service_id, &key, &value)
+        .map_err(|error| friendly_error(&error, SAVE_SECRET_FALLBACK))?;
     database
         .ensure_secret_key(&service_id, &key)
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), SAVE_SECRET_FALLBACK))?;
     Ok(())
 }
 
 #[tauri::command]
 fn delete_service_secret(service_id: String, key: String) -> Result<(), String> {
-    delete_secret(&service_id, &key)
+    delete_secret(&service_id, &key).map_err(|error| friendly_error(&error, SAVE_SECRET_FALLBACK))
 }
 
 #[tauri::command]
@@ -251,9 +277,9 @@ fn list_services(state: tauri::State<'_, AppState>) -> Result<Vec<Service>, Stri
     state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?
         .list_services()
-        .map_err(|error| error.to_string())
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))
 }
 
 #[tauri::command]
@@ -261,9 +287,9 @@ fn get_service(id: String, state: tauri::State<'_, AppState>) -> Result<Option<S
     state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?
         .get_service(&id)
-        .map_err(|error| error.to_string())
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))
 }
 
 #[tauri::command]
@@ -278,13 +304,13 @@ fn create_service(
         let mut database = state
             .database
             .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?;
         database
             .insert_service(&service)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?;
         database
             .get_service(&service.id)
-            .map_err(|error| error.to_string())?
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?
             .ok_or_else(|| "Created service could not be loaded".to_string())?
     };
     refresh_tray_menu(&app);
@@ -303,22 +329,22 @@ fn update_service(
         let database = state
             .database
             .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?;
         database
             .get_service(&service.id)
-            .map_err(|error| error.to_string())?
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?
     };
     let updated = {
         let mut database = state
             .database
             .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?;
         database
             .update_service(&service)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?;
         database
             .get_service(&service.id)
-            .map_err(|error| error.to_string())?
+            .map_err(|error| friendly_error(&error.to_string(), SAVE_SERVICE_FALLBACK))?
             .ok_or_else(|| "Updated service could not be loaded".to_string())?
     };
     let previous_icon = previous
@@ -357,7 +383,9 @@ async fn delete_service(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<bool, String> {
-    delete_service_from_state(id, &app, &state).await
+    delete_service_from_state(id, &app, &state)
+        .await
+        .map_err(|error| friendly_error(&error, DELETE_SERVICE_FALLBACK))
 }
 
 async fn delete_service_from_state<R: Runtime>(
@@ -477,9 +505,11 @@ fn import_service_icon(source_path: String, app: tauri::AppHandle) -> Result<Str
     let icon_directory = app
         .path()
         .app_data_dir()
-        .map_err(|error| error.to_string())?
+        .map_err(|error| friendly_error(&error.to_string(), SAVE_ICON_FALLBACK))?
         .join("icons");
-    copy_icon_to_directory(&source, &icon_directory).map(|path| path.to_string_lossy().into_owned())
+    copy_icon_to_directory(&source, &icon_directory)
+        .map(|path| path.to_string_lossy().into_owned())
+        .map_err(|error| friendly_error(&error, SAVE_ICON_FALLBACK))
 }
 
 fn copy_icon_to_directory(
@@ -522,9 +552,9 @@ fn get_app_setting(
     state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?
         .get_setting(&key)
-        .map_err(|error| error.to_string())
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))
 }
 
 #[tauri::command]
@@ -549,17 +579,21 @@ fn set_app_setting(
         use tauri_plugin_autostart::ManagerExt;
         let manager = app.autolaunch();
         if enabled {
-            manager.enable().map_err(|error| error.to_string())?;
+            manager
+                .enable()
+                .map_err(|error| friendly_error(&error.to_string(), SAVE_SETTING_FALLBACK))?;
         } else {
-            manager.disable().map_err(|error| error.to_string())?;
+            manager
+                .disable()
+                .map_err(|error| friendly_error(&error.to_string(), SAVE_SETTING_FALLBACK))?;
         }
     }
     state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?
+        .map_err(|error| friendly_error(&error.to_string(), SAVE_SETTING_FALLBACK))?
         .set_setting(&key, &value)
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), SAVE_SETTING_FALLBACK))?;
     if let Some(days) = retention_days {
         state.processes.set_log_retention_days(days);
     }
@@ -573,7 +607,12 @@ async fn start_targets<R: Runtime>(
 ) -> (Vec<String>, Vec<String>) {
     let (services, edges) = match service_graph(state) {
         Ok(graph) => graph,
-        Err(error) => return (Vec::new(), vec![error]),
+        Err(error) => {
+            return (
+                Vec::new(),
+                vec![friendly_error(&error, LOAD_SERVICES_FALLBACK)],
+            );
+        }
     };
     let by_id = services
         .iter()
@@ -599,7 +638,7 @@ async fn start_targets<R: Runtime>(
                     .get(target)
                     .map(|service| service.name.as_str())
                     .unwrap_or(target.as_str());
-                failures.push(format!("{name}: {error}"));
+                failures.push(service_failure(name, &error, START_SERVICE_FALLBACK));
             }
         }
     }
@@ -623,7 +662,11 @@ async fn start_targets<R: Runtime>(
             continue;
         }
         if let Err(error) = reconcile_active_process(state, &service_id).await {
-            failures.push(format!("{}: {error}", service.name));
+            failures.push(service_failure(
+                &service.name,
+                &error,
+                START_SERVICE_FALLBACK,
+            ));
             failed.insert(service.id.clone());
             continue;
         }
@@ -631,12 +674,20 @@ async fn start_targets<R: Runtime>(
             Ok(()) => match wait_for_service_ready(state, &service).await {
                 Ok(()) => started.push(service.name),
                 Err(error) => {
-                    failures.push(format!("{}: {error}", service.name));
+                    failures.push(service_failure(
+                        &service.name,
+                        &error,
+                        START_SERVICE_FALLBACK,
+                    ));
                     failed.insert(service.id.clone());
                 }
             },
             Err(error) => {
-                failures.push(format!("{}: {error}", service.name));
+                failures.push(service_failure(
+                    &service.name,
+                    &error,
+                    START_SERVICE_FALLBACK,
+                ));
                 failed.insert(service.id.clone());
             }
         }
@@ -653,7 +704,8 @@ async fn start_auto_start_services(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let (services, _) = service_graph(&state)?;
+    let (services, _) =
+        service_graph(&state).map_err(|error| friendly_error(&error, LOAD_SERVICES_FALLBACK))?;
     let targets = services
         .iter()
         .filter(|service| service.enabled && service.auto_start)
@@ -670,7 +722,8 @@ async fn start_all_services(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let (services, _) = service_graph(&state)?;
+    let (services, _) =
+        service_graph(&state).map_err(|error| friendly_error(&error, LOAD_SERVICES_FALLBACK))?;
     let targets = services
         .iter()
         .filter(|service| service.enabled)
@@ -687,8 +740,11 @@ async fn restart_all_services(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let mut failures = stop_all_from_state(&app, &state).await?;
-    let (services, _) = service_graph(&state)?;
+    let mut failures = stop_all_from_state(&app, &state)
+        .await
+        .map_err(|error| friendly_error(&error, RESTART_SERVICE_FALLBACK))?;
+    let (services, _) =
+        service_graph(&state).map_err(|error| friendly_error(&error, LOAD_SERVICES_FALLBACK))?;
     let targets = services
         .iter()
         .filter(|service| service.enabled)
@@ -709,17 +765,17 @@ async fn recover_orphaned_services(
         let database = state
             .database
             .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?;
         let names = database
             .list_services()
-            .map_err(|error| error.to_string())?
+            .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?
             .into_iter()
             .map(|service| (service.id, service.name))
             .collect::<std::collections::HashMap<_, _>>();
         Ok::<_, String>((
             database
                 .list_active_processes()
-                .map_err(|error| error.to_string())?,
+                .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?,
             names,
         ))
     })?;
@@ -739,9 +795,9 @@ async fn recover_orphaned_services(
                 state
                     .database
                     .lock()
-                    .map_err(|_| "Database lock poisoned".to_string())?
+                    .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))?
                     .delete_active_process(&record.service_id)
-                    .map_err(|error| error.to_string())
+                    .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))
             })?;
             cleared.push(name);
             continue;
@@ -753,14 +809,16 @@ async fn recover_orphaned_services(
                     state
                         .database
                         .lock()
-                        .map_err(|_| "Database lock poisoned".to_string())?
+                        .map_err(|error| {
+                            friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK)
+                        })?
                         .delete_active_process(&record.service_id)
-                        .map_err(|error| error.to_string())
+                        .map_err(|error| friendly_error(&error.to_string(), LOAD_SERVICES_FALLBACK))
                 })?;
                 cleared.push(name);
             }
             Ok(process_manager::OrphanedProcessRecovery::Unverifiable) => unverifiable.push(name),
-            Err(error) => failures.push(format!("{name}: {error}")),
+            Err(error) => failures.push(service_failure(&name, &error, STOP_SERVICE_FALLBACK)),
         }
     }
     Ok(serde_json::json!({
@@ -828,9 +886,14 @@ async fn stop_process_ids<R: Runtime>(
     let mut failures = Vec::new();
     while let Some(result) = tasks.join_next().await {
         match result {
-            Ok((id, Err(error))) => failures.push(format!("{id}: {error}")),
+            Ok((id, Err(error))) => {
+                failures.push(service_failure(&id, &error, STOP_SERVICE_FALLBACK));
+            }
             Ok((_, Ok(()))) => {}
-            Err(error) => failures.push(format!("stop task failed: {error}")),
+            Err(error) => failures.push(friendly_error(
+                &format!("stop task failed: {error}"),
+                STOP_SERVICE_FALLBACK,
+            )),
         }
     }
     Ok(failures)
@@ -841,12 +904,12 @@ async fn quit_application(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let failures = stop_all_services(app.clone(), state).await?;
+    let failures = stop_all_services(app.clone(), state)
+        .await
+        .map_err(|error| friendly_error(&error, QUIT_FALLBACK))?;
     if !failures.is_empty() {
-        return Err(format!(
-            "Could not stop all services: {}",
-            failures.join("; ")
-        ));
+        log::warn!("event=quit_stop_failed failures={}", failures.join("; "));
+        return Err(QUIT_FALLBACK.to_string());
     }
     app.exit(0);
     Ok(())
@@ -880,28 +943,31 @@ fn configuration_json(state: &AppState) -> Result<String, String> {
     let database = state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), EXPORT_CONFIGURATION_FALLBACK))?;
     serde_json::to_string_pretty(&ConfigurationFile {
         format_version: CONFIGURATION_FORMAT_VERSION,
         services: database
             .list_services()
-            .map_err(|error| error.to_string())?,
+            .map_err(|error| friendly_error(&error.to_string(), EXPORT_CONFIGURATION_FALLBACK))?,
         settings: database
             .list_settings()
-            .map_err(|error| error.to_string())?,
+            .map_err(|error| friendly_error(&error.to_string(), EXPORT_CONFIGURATION_FALLBACK))?,
     })
-    .map_err(|error| error.to_string())
+    .map_err(|error| friendly_error(&error.to_string(), EXPORT_CONFIGURATION_FALLBACK))
 }
 
 #[tauri::command]
 fn export_configuration(state: tauri::State<'_, AppState>) -> Result<String, String> {
     configuration_json(&state)
+        .map_err(|error| friendly_error(&error, EXPORT_CONFIGURATION_FALLBACK))
 }
 
 #[tauri::command]
 fn export_configuration_to(path: String, state: tauri::State<'_, AppState>) -> Result<(), String> {
-    let json = configuration_json(&state)?;
-    std::fs::write(path, json).map_err(|error| error.to_string())
+    let json = configuration_json(&state)
+        .map_err(|error| friendly_error(&error, EXPORT_CONFIGURATION_FALLBACK))?;
+    std::fs::write(path, json)
+        .map_err(|error| friendly_error(&error.to_string(), EXPORT_CONFIGURATION_FALLBACK))
 }
 
 #[tauri::command]
@@ -910,9 +976,14 @@ fn import_configuration_from(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<ImportReport, String> {
-    let contents = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
-    let configuration: ConfigurationFile = serde_json::from_str(&contents)
-        .map_err(|error| format!("Invalid configuration file: {error}"))?;
+    let contents = std::fs::read_to_string(path)
+        .map_err(|error| friendly_error(&error.to_string(), IMPORT_CONFIGURATION_FALLBACK))?;
+    let configuration: ConfigurationFile = serde_json::from_str(&contents).map_err(|error| {
+        friendly_error(
+            &format!("Invalid configuration file: {error}"),
+            IMPORT_CONFIGURATION_FALLBACK,
+        )
+    })?;
     if configuration.format_version != CONFIGURATION_FORMAT_VERSION {
         return Err(format!(
             "Unsupported configuration format version {}",
@@ -965,10 +1036,10 @@ fn import_configuration(
     let mut database = state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), IMPORT_CONFIGURATION_FALLBACK))?;
     let existing_services = database
         .list_services()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), IMPORT_CONFIGURATION_FALLBACK))?;
     let existing_ids = existing_services
         .iter()
         .map(|service| service.id.clone())
@@ -1023,7 +1094,7 @@ fn import_configuration(
     known_ids.extend(planned.iter().map(|(service, _)| service.id.clone()));
     let mut proposed_edges = database
         .list_dependencies()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), IMPORT_CONFIGURATION_FALLBACK))?;
     let mut mapped_dependencies = Vec::with_capacity(planned.len());
     for (service, dependencies) in &planned {
         let mut mapped = dependencies
@@ -1057,7 +1128,7 @@ fn import_configuration(
     for (service, _) in &planned {
         database
             .insert_service(service)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), IMPORT_CONFIGURATION_FALLBACK))?;
         report.imported_services += 1;
     }
     for ((service, _), dependencies) in planned.iter().zip(mapped_dependencies) {
@@ -1068,7 +1139,7 @@ fn import_configuration(
         updated.depends_on = dependencies;
         database
             .update_service(&updated)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), IMPORT_CONFIGURATION_FALLBACK))?;
     }
 
     for (key, value) in configuration.settings {
@@ -1077,7 +1148,7 @@ fn import_configuration(
         }
         database
             .set_setting(&key, &value)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| friendly_error(&error.to_string(), IMPORT_CONFIGURATION_FALLBACK))?;
         report.imported_settings += 1;
     }
     if let Some(days) = database
@@ -1089,6 +1160,39 @@ fn import_configuration(
         state.processes.set_log_retention_days(days);
     }
     Ok(report)
+}
+
+fn friendly_update_error(message: &str, fallback: &str) -> String {
+    eprintln!("updater error: {message}");
+
+    let message = message.to_lowercase();
+    let has = |needles: &[&str]| needles.iter().any(|needle| message.contains(needle));
+
+    if has(&["insecure transport", "not secure"]) {
+        "The update server isn't secure. Try again from an official release.".to_string()
+    } else if has(&["platform"]) && has(&["not found", "were found"]) {
+        "No update is available for this platform yet.".to_string()
+    } else if has(&["unsupported os", "unsupported application architecture"]) {
+        "This build can't check for updates on this platform.".to_string()
+    } else if has(&["release json", "release not found", "release.json"]) {
+        "Update information is unavailable right now. Try again later.".to_string()
+    } else if has(&[
+        "signature",
+        "minisign",
+        "base64",
+        "signed for version",
+        "verification",
+    ]) {
+        "The update couldn't be verified. Try again or download it from GitHub.".to_string()
+    } else if has(&["timed out", "timeout"]) {
+        "The update check timed out. Try again.".to_string()
+    } else if has(&[
+        "network", "connect", "dns", "request", "reqwest", "http", "download",
+    ]) {
+        "Couldn't reach the update server. Check your connection and try again.".to_string()
+    } else {
+        fallback.to_string()
+    }
 }
 
 #[derive(Serialize)]
@@ -1103,11 +1207,20 @@ struct UpdateInfo {
 #[tauri::command]
 async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
     use tauri_plugin_updater::UpdaterExt;
-    let updater = app.updater().map_err(|error| error.to_string())?;
+    let updater = app.updater().map_err(|error| {
+        friendly_update_error(&error.to_string(), "Update check failed. Try again later.")
+    })?;
     let update = tokio::time::timeout(Duration::from_secs(2), updater.check())
         .await
-        .map_err(|_| "Update check timed out.".to_string())?
-        .map_err(|error| error.to_string())?;
+        .map_err(|_| {
+            friendly_update_error(
+                "Update check timed out.",
+                "Update check failed. Try again later.",
+            )
+        })?
+        .map_err(|error| {
+            friendly_update_error(&error.to_string(), "Update check failed. Try again later.")
+        })?;
     Ok(update.map(|update| UpdateInfo {
         version: update.version,
         current_version: update.current_version,
@@ -1128,11 +1241,26 @@ async fn install_update(
     }
     let _guard = UpdateInstallGuard;
 
-    let updater = app.updater().map_err(|error| error.to_string())?;
+    let updater = app.updater().map_err(|error| {
+        friendly_update_error(
+            &error.to_string(),
+            "The update couldn't be installed. Try again or download it from GitHub.",
+        )
+    })?;
     let Some(update) = tokio::time::timeout(Duration::from_secs(2), updater.check())
         .await
-        .map_err(|_| "Update check timed out.".to_string())?
-        .map_err(|error| error.to_string())?
+        .map_err(|_| {
+            friendly_update_error(
+                "Update check timed out.",
+                "The update couldn't be installed. Try again or download it from GitHub.",
+            )
+        })?
+        .map_err(|error| {
+            friendly_update_error(
+                &error.to_string(),
+                "The update couldn't be installed. Try again or download it from GitHub.",
+            )
+        })?
     else {
         return Err("No update is available.".into());
     };
@@ -1158,7 +1286,12 @@ async fn install_update(
             || {},
         )
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| {
+            friendly_update_error(
+                &error.to_string(),
+                "The update couldn't be installed. Try again or download it from GitHub.",
+            )
+        })?;
 
     let _ = app.emit(
         "update-status",
@@ -1171,7 +1304,12 @@ async fn install_update(
             failures.join("; ")
         ));
     }
-    update.install(&bytes).map_err(|error| error.to_string())?;
+    update.install(&bytes).map_err(|error| {
+        friendly_update_error(
+            &error.to_string(),
+            "The update couldn't be installed. Try again or download it from GitHub.",
+        )
+    })?;
 
     let _ = app.emit(
         "update-status",
@@ -1186,7 +1324,9 @@ async fn start_service(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    start_service_from_state(id, &app, &state).await
+    start_service_from_state(id, &app, &state)
+        .await
+        .map_err(|error| friendly_error(&error, START_SERVICE_FALLBACK))
 }
 
 async fn start_service_from_state<R: Runtime>(
@@ -1221,15 +1361,19 @@ async fn get_service_logs(
         state
             .database
             .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?
+            .map_err(|error| friendly_error(&error.to_string(), LOAD_LOGS_FALLBACK))?
             .get_service(&id)
-            .map_err(|error| error.to_string())
+            .map_err(|error| friendly_error(&error.to_string(), LOAD_LOGS_FALLBACK))
             .map(|service| service.is_some())
     })?;
     if !exists {
         return Err("Service not found".into());
     }
-    state.processes.load_logs(&id).await
+    state
+        .processes
+        .load_logs(&id)
+        .await
+        .map_err(|error| friendly_error(&error, LOAD_LOGS_FALLBACK))
 }
 
 #[tauri::command]
@@ -1240,17 +1384,17 @@ fn get_service_run_history(
     let database = state
         .database
         .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?;
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_LOGS_FALLBACK))?;
     if database
         .get_service(&id)
-        .map_err(|error| error.to_string())?
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_LOGS_FALLBACK))?
         .is_none()
     {
         return Err("Service not found".into());
     }
     database
         .list_run_history(&id)
-        .map_err(|error| error.to_string())
+        .map_err(|error| friendly_error(&error.to_string(), LOAD_LOGS_FALLBACK))
 }
 
 #[tauri::command]
@@ -1259,7 +1403,11 @@ async fn stop_service(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    state.processes.stop(&id, &app).await
+    state
+        .processes
+        .stop(&id, &app)
+        .await
+        .map_err(|error| friendly_error(&error, STOP_SERVICE_FALLBACK))
 }
 
 #[tauri::command]
@@ -1268,22 +1416,32 @@ async fn restart_service(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let (services, edges) = service_graph(&state)?;
+    restart_service_from_state(id, &app, &state)
+        .await
+        .map_err(|error| friendly_error(&error, RESTART_SERVICE_FALLBACK))
+}
+
+async fn restart_service_from_state<R: Runtime>(
+    id: String,
+    app: &tauri::AppHandle<R>,
+    state: &AppState,
+) -> Result<(), String> {
+    let (services, edges) = service_graph(state)?;
     let order = dependencies::start_order(std::slice::from_ref(&id), &services, &edges)?;
     let by_id = services
         .into_iter()
         .map(|service| (service.id.clone(), service))
         .collect::<HashMap<_, _>>();
-    reconcile_active_process(&state, &id).await?;
-    state.processes.stop(&id, &app).await?;
+    reconcile_active_process(state, &id).await?;
+    state.processes.stop(&id, app).await?;
     for service_id in order {
         if state.processes.is_running(&service_id) {
             continue;
         }
-        reconcile_active_process(&state, &service_id).await?;
+        reconcile_active_process(state, &service_id).await?;
         let service = by_id.get(&service_id).cloned().ok_or("Service not found")?;
         state.processes.start(service.clone(), app.clone()).await?;
-        wait_for_service_ready(&state, &service).await?;
+        wait_for_service_ready(state, &service).await?;
     }
     Ok(())
 }
@@ -2203,5 +2361,92 @@ mod tests {
         assert!(outside.exists(), "icons outside app data are untouched");
 
         let _ = std::fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(test)]
+mod updater_copy_tests {
+    use super::friendly_update_error;
+
+    const CHECK_FALLBACK: &str = "Update check failed. Try again later.";
+
+    #[test]
+    fn platform_missing_errors_get_platform_copy() {
+        let expected = "No update is available for this platform yet.";
+
+        assert_eq!(
+            friendly_update_error(
+                "the platform `darwin-aarch64` was not found in the response `platforms` object",
+                CHECK_FALLBACK,
+            ),
+            expected,
+        );
+        assert_eq!(
+            friendly_update_error(
+                "None of the fallback platforms `[\"darwin-aarch64\"]` were found in the response `platforms` object",
+                CHECK_FALLBACK,
+            ),
+            expected,
+        );
+    }
+
+    #[test]
+    fn unsupported_platform_errors_get_build_copy() {
+        assert_eq!(
+            friendly_update_error(
+                "Unsupported OS, expected one of windows, linux, macos",
+                CHECK_FALLBACK,
+            ),
+            "This build can't check for updates on this platform.",
+        );
+    }
+
+    #[test]
+    fn release_errors_get_unavailable_copy() {
+        assert_eq!(
+            friendly_update_error(
+                "Could not fetch a valid release JSON from the remote",
+                CHECK_FALLBACK,
+            ),
+            "Update information is unavailable right now. Try again later.",
+        );
+    }
+
+    #[test]
+    fn signature_errors_get_verification_copy() {
+        assert_eq!(
+            friendly_update_error(
+                "The signature `abc123` could not be decoded",
+                CHECK_FALLBACK,
+            ),
+            "The update couldn't be verified. Try again or download it from GitHub.",
+        );
+    }
+
+    #[test]
+    fn request_errors_get_network_copy() {
+        assert_eq!(
+            friendly_update_error(
+                "error sending request for url (https://example.com/latest.json)",
+                CHECK_FALLBACK,
+            ),
+            "Couldn't reach the update server. Check your connection and try again.",
+        );
+    }
+
+    #[test]
+    fn timeouts_get_timeout_copy() {
+        assert_eq!(
+            friendly_update_error("Update check timed out.", CHECK_FALLBACK),
+            "The update check timed out. Try again.",
+        );
+    }
+
+    #[test]
+    fn unknown_errors_use_the_fallback() {
+        assert_eq!(
+            friendly_update_error("something unexpected", CHECK_FALLBACK),
+            CHECK_FALLBACK,
+        );
     }
 }

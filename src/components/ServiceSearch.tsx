@@ -1,5 +1,4 @@
-import { Button } from "@processhub/design-system";
-import { Search, X } from "lucide-react";
+import { SearchField } from "@processhub/design-system";
 import { useEffect, useRef } from "react";
 
 interface ServiceSearchProps {
@@ -17,26 +16,16 @@ export function ServiceSearch({
   useEffect(() => inputRef.current?.focus(), []);
 
   return (
-    <search className="service-search">
-      <Search size={15} aria-hidden="true" />
-      <input
-        ref={inputRef}
-        type="search"
-        aria-label="Search processes"
-        placeholder="Search processes…"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") onClose();
-        }}
-      />
-      <Button
-        size="xs"
-        variant="icon"
-        aria-label="Close search"
-        icon={<X size={15} />}
-        onClick={onClose}
-      />
-    </search>
+    <SearchField
+      ref={inputRef}
+      className="service-search"
+      size="md"
+      label="Search processes"
+      placeholder="Search processes…"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      onClear={() => onChange("")}
+      onEscape={onClose}
+    />
   );
 }

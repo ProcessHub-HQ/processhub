@@ -1,4 +1,4 @@
-import { Button, Modal } from "@processhub/design-system";
+import { Button, Modal, ProgressBar } from "@processhub/design-system";
 import {
   AlertCircle,
   CheckCircle2,
@@ -147,9 +147,7 @@ export function UpdateDialog() {
             role="status"
             aria-label="Checking for updates"
           >
-            <div className="update-progress indeterminate">
-              <span />
-            </div>
+            <ProgressBar label="Checking for updates" />
           </div>
         )}
 
@@ -164,13 +162,7 @@ export function UpdateDialog() {
 
         {busy && (
           <div className="update-busy" role="status">
-            <div
-              className={`update-progress ${percent === null ? "indeterminate" : ""}`}
-            >
-              <span
-                style={percent === null ? undefined : { width: `${percent}%` }}
-              />
-            </div>
+            <ProgressBar label="Update progress" value={percent ?? undefined} />
             {percent !== null && (
               <span className="update-progress-value">{percent}%</span>
             )}

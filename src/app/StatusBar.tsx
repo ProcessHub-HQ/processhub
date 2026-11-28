@@ -1,3 +1,4 @@
+import { StatusDot, type StatusDotStatus } from "@processhub/design-system";
 import { Activity, ArrowUpCircle } from "lucide-react";
 import { useServicesStore } from "../stores/servicesStore";
 import { useUiStore } from "../stores/uiStore";
@@ -48,7 +49,7 @@ export function StatusBar() {
   const idle = services.length > 0 && activeCount === 0;
   const label =
     services.length === 0 ? "Ready" : idle ? "Idle" : `${activeCount} active`;
-  const dotClass =
+  const dotStatus: StatusDotStatus =
     services.length === 0 || idle
       ? "idle"
       : failedCount > 0
@@ -59,12 +60,12 @@ export function StatusBar() {
     <footer className="status-bar">
       <div className="status-group">
         <span className="status-item">
-          <span className={`status-dot ${dotClass}`} aria-hidden="true" />
+          <StatusDot status={dotStatus} aria-hidden="true" />
           {label}
         </span>
         {failedCount > 0 && (
           <span className="status-item failed">
-            <span className="status-dot failed" aria-hidden="true" />
+            <StatusDot status="danger" aria-hidden="true" />
             {failedCount} failed
           </span>
         )}
