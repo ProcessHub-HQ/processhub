@@ -581,7 +581,7 @@ body {
   font-weight: 600;
 }
 
-.appearance-switch {
+.segmented-control {
   display: inline-flex;
   height: 28px;
   flex: 0 0 auto;
@@ -593,7 +593,7 @@ body {
   box-shadow: inset 0 0 0 1px var(--ph-color-line);
 }
 
-.appearance-switch__option {
+.segmented-control__option {
   display: inline-flex;
   height: 24px;
   align-items: center;
@@ -613,11 +613,11 @@ body {
     background-color var(--ph-duration-fast) var(--ph-ease-out);
 }
 
-.appearance-switch__option:hover:not([aria-checked="true"]) {
+.segmented-control__option:hover:not([aria-checked="true"]) {
   color: var(--ph-color-text-secondary);
 }
 
-.appearance-switch__option[aria-checked="true"] {
+.segmented-control__option[aria-checked="true"] {
   color: var(--ph-color-text);
   background: var(--ph-color-surface);
   font-weight: 600;
@@ -626,7 +626,7 @@ body {
     inset 0 0 0 1px var(--ph-color-line);
 }
 
-.appearance-switch__option:focus-visible {
+.segmented-control__option:focus-visible {
   outline: var(--ph-focus-width) solid var(--ph-color-focus);
   outline-offset: -2px;
 }
@@ -1653,6 +1653,14 @@ textarea {
   gap: 10px;
 }
 
+.monitor-tabs {
+  justify-self: start;
+}
+
+.monitor-tabs .segmented-control__option {
+  padding: 0 12px;
+}
+
 .monitor-sort-header {
   display: inline-flex;
   align-items: center;
@@ -1715,7 +1723,12 @@ textarea {
 }
 
 .monitor-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-top: 8px;
   border-bottom: 1px solid var(--line-soft);
+  background: var(--canvas);
 }
 
 .monitor-th {
@@ -1878,4 +1891,55 @@ textarea {
   place-items: center;
   color: var(--faint);
   font-size: var(--ph-text-body);
+}
+
+.monitor-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--ph-color-danger-line);
+  border-radius: var(--ph-radius-card);
+  color: var(--ph-color-danger-text-emphasis);
+  background: var(--ph-color-danger-soft);
+  font-size: var(--ph-text-caption-strong);
+}
+
+.monitor-table--system .monitor-table-head,
+.monitor-table--system .monitor-row {
+  grid-template-columns: 36% 9% 17% 17% 10% 11%;
+}
+
+.monitor-table--system .monitor-process-name {
+  font-size: 13px;
+}
+
+.monitor-system-icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ph-radius-md);
+  color: var(--ph-color-muted);
+  background: var(--ph-color-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--ph-color-line);
+}
+
+.monitor-system-path {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-parent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

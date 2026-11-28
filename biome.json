@@ -54,7 +54,7 @@
 		},
 		{
 			"includes": [
-				"src/components/AppearanceSwitch.tsx"
+				"src/components/SegmentedControl.tsx"
 			],
 			"linter": {
 				"rules": {

@@ -158,6 +158,17 @@ export interface UpdateProgress {
   total: number | null;
 }
 
+export interface SystemProcess {
+  pid: number;
+  name: string;
+  path: string | null;
+  cpuPercent: number;
+  memoryBytes: number;
+  parentPid: number | null;
+  parentName: string | null;
+  runTimeSeconds: number;
+}
+
 export interface AppSettings {
   theme: "dark";
   startAtLogin: boolean;

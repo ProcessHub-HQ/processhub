@@ -3,6 +3,7 @@ mod dependencies;
 mod error_copy;
 mod models;
 mod process_manager;
+mod system_processes;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -1451,6 +1452,17 @@ fn get_runtime_states(state: tauri::State<'_, AppState>) -> Vec<models::RuntimeS
     state.processes.states()
 }
 
+#[tauri::command]
+async fn list_system_processes() -> Result<Vec<system_processes::SystemProcess>, String> {
+    tauri::async_runtime::spawn_blocking(system_processes::list_system_processes)
+        .await
+        .map_err(|error| {
+            let raw = error.to_string();
+            log::warn!("event=system_processes_task_failed error={raw}");
+            friendly_error(&raw, system_processes::LOAD_SYSTEM_PROCESSES_FALLBACK)
+        })?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1689,7 +1701,8 @@ pub fn run() {
             get_service_run_history,
             stop_service,
             restart_service,
-            get_runtime_states
+            get_runtime_states,
+            list_system_processes
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
