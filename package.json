@@ -17,7 +17,7 @@
     "release:notes": "node scripts/release-notes.mjs"
   },
   "dependencies": {
-    "@processhub/design-system": "github:ProcessHub-HQ/processhub-design-system#v0.2.1",
+    "@processhub/design-system": "github:ProcessHub-HQ/processhub-design-system#v0.2.2",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-opener": "^2",

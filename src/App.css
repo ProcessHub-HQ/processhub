@@ -57,6 +57,19 @@ body {
   user-select: none;
 }
 
+.ph-dialog-scrim {
+  top: var(--app-bar-height);
+}
+
+.ph-modal-open .app-bar {
+  border-bottom: 1px solid var(--ph-color-line-soft);
+}
+
+.ph-modal-open .app-bar-actions {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .app-bar-title {
   position: absolute;
   left: 50%;
@@ -761,7 +774,7 @@ body {
   display: flex;
   width: min(100%, 640px);
   min-height: 320px;
-  max-height: min(680px, calc(100dvh - 40px));
+  max-height: min(680px, calc(100dvh - var(--app-bar-height) - 40px));
   flex-direction: column;
   padding: 20px 24px 16px;
   border: 1px solid var(--line);
@@ -1056,7 +1069,7 @@ body {
 .service-dialog {
   display: flex;
   width: min(100%, 660px);
-  height: min(680px, calc(100dvh - 40px));
+  height: min(680px, calc(100dvh - var(--app-bar-height) - 40px));
   flex-direction: column;
   overflow: hidden;
   padding: 0;
@@ -1109,7 +1122,7 @@ body {
 .log-dialog {
   display: flex;
   width: min(720px, 100%);
-  height: min(700px, calc(100dvh - 40px));
+  height: min(700px, calc(100dvh - var(--app-bar-height) - 40px));
   flex-direction: column;
   padding: 18px 20px;
   border: 1px solid var(--line);
