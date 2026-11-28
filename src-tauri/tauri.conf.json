@@ -21,8 +21,6 @@
         "maxHeight": 550,
         "resizable": true,
         "visible": true,
-        "theme": "Dark",
-        "backgroundColor": "#17181a",
         "titleBarStyle": "Overlay",
         "trafficLightPosition": {
           "x": 20,

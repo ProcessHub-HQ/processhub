@@ -51,6 +51,18 @@
 					}
 				}
 			}
+		},
+		{
+			"includes": [
+				"src/components/AppearanceSwitch.tsx"
+			],
+			"linter": {
+				"rules": {
+					"a11y": {
+						"useSemanticElements": "off"
+					}
+				}
+			}
 		}
 	]
 }

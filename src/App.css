@@ -555,6 +555,88 @@ body {
 .settings-popover {
   top: calc(var(--app-bar-height) - 6px);
   right: var(--page-gutter);
+  width: 260px;
+  padding: 5px;
+  border: 1px solid var(--ph-color-menu-border);
+  border-radius: var(--ph-radius-card);
+  color: var(--ph-color-menu-item-text);
+  background: var(--ph-color-menu-bg);
+  box-shadow: var(--ph-shadow-menu);
+  font-size: var(--ph-text-body);
+}
+
+.settings-appearance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding: 3px 4px 9px;
+  border-bottom: 1px solid var(--ph-color-menu-separator);
+}
+
+.settings-appearance__label {
+  color: var(--ph-color-menu-label);
+  font-size: var(--ph-text-caption);
+  font-weight: 600;
+}
+
+.appearance-switch {
+  display: inline-flex;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--ph-radius-control);
+  background: var(--ph-color-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--ph-color-line);
+}
+
+.appearance-switch__option {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--ph-radius-xs);
+  color: var(--ph-color-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--ph-text-caption);
+  font-weight: 500;
+  line-height: 1;
+  cursor: default;
+  transition:
+    color var(--ph-duration-fast) var(--ph-ease-out),
+    background-color var(--ph-duration-fast) var(--ph-ease-out);
+}
+
+.appearance-switch__option:hover:not([aria-checked="true"]) {
+  color: var(--ph-color-text-secondary);
+}
+
+.appearance-switch__option[aria-checked="true"] {
+  color: var(--ph-color-text);
+  background: var(--ph-color-surface);
+  font-weight: 600;
+  box-shadow:
+    0 1px 2px var(--ph-color-line),
+    inset 0 0 0 1px var(--ph-color-line);
+}
+
+.appearance-switch__option:focus-visible {
+  outline: var(--ph-focus-width) solid var(--ph-color-focus);
+  outline-offset: -2px;
+}
+
+.settings-menu {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .about-dialog {
