@@ -164,10 +164,7 @@ pub fn friendly_error(message: &str, fallback: &str) -> String {
     let lower = message.to_lowercase();
 
     for (needles, copy) in RULES {
-        if needles
-            .iter()
-            .any(|needle| contains_needle(&lower, needle))
-        {
+        if needles.iter().any(|needle| contains_needle(&lower, needle)) {
             log::warn!("event=raw_error original={original} friendly={copy}");
             return (*copy).to_string();
         }
