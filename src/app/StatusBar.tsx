@@ -1,8 +1,6 @@
-import { ArrowUpCircle, Play, Square } from "lucide-react";
-import { useState } from "react";
+import { Activity, ArrowUpCircle } from "lucide-react";
 import { useServicesStore } from "../stores/servicesStore";
 import { useUiStore } from "../stores/uiStore";
-import { useAppCommands } from "./useAppCommands";
 
 function formatMemory(bytes: number) {
   const megabytes = bytes / (1024 * 1024);
@@ -16,8 +14,8 @@ export function StatusBar() {
   const runtime = useServicesStore((state) => state.runtime);
   const availableUpdate = useUiStore((state) => state.availableUpdate);
   const openUpdateDialog = useUiStore((state) => state.openUpdateDialog);
-  const { runGlobalAction } = useAppCommands();
-  const [bulkAction, setBulkAction] = useState<"start" | "stop" | null>(null);
+  const view = useUiStore((state) => state.view);
+  const toggleMonitor = useUiStore((state) => state.toggleMonitor);
 
   const activeCount = services.filter((service) =>
     ["running", "starting", "stopping", "waiting_to_restart"].includes(
@@ -80,34 +78,16 @@ export function StatusBar() {
             {hasMemory && <span>MEM {formatMemory(memory)}</span>}
           </span>
         )}
-        <span className="status-actions">
-          <button
-            className="status-action"
-            type="button"
-            disabled={services.length === 0 || bulkAction !== null}
-            aria-busy={bulkAction === "start"}
-            onClick={() => {
-              setBulkAction("start");
-              void runGlobalAction("start").finally(() => setBulkAction(null));
-            }}
-          >
-            <Play size={10} />
-            Start all
-          </button>
-          <button
-            className="status-action"
-            type="button"
-            disabled={activeCount === 0 || bulkAction !== null}
-            aria-busy={bulkAction === "stop"}
-            onClick={() => {
-              setBulkAction("stop");
-              void runGlobalAction("stop").finally(() => setBulkAction(null));
-            }}
-          >
-            <Square size={10} />
-            Stop all
-          </button>
-        </span>
+        <button
+          className={`status-action status-monitor ${view === "monitor" ? "active" : ""}`}
+          type="button"
+          aria-pressed={view === "monitor"}
+          title="Process Monitor"
+          onClick={toggleMonitor}
+        >
+          <Activity size={11} />
+          Process Monitor
+        </button>
         {availableUpdate && (
           <button
             className="status-update"

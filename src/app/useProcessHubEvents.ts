@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { processHubEvents } from "../lib/events";
 import { processHub } from "../lib/processhub";
 import { useLogsStore } from "../stores/logsStore";
+import { useMetricsStore } from "../stores/metricsStore";
 import { useServicesStore } from "../stores/servicesStore";
 import { useUiStore } from "../stores/uiStore";
 import type { UpdatePhase, UpdateProgress } from "../types";
@@ -34,6 +35,7 @@ export function useProcessHubEvents() {
     void processHubEvents
       .onRuntimeState((state) => {
         useServicesStore.getState().setRuntimeState(state);
+        useMetricsStore.getState().record(state);
         if (TERMINAL_STATUSES.includes(state.status)) {
           void useLogsStore
             .getState()

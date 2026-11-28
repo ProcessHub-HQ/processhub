@@ -7,7 +7,10 @@ import type {
   UpdateProgress,
 } from "../types";
 
+export type AppView = "workspace" | "monitor";
+
 interface UiState {
+  view: AppView;
   settingsOpen: boolean;
   checkingForUpdates: boolean;
   availableUpdate: UpdateInfo | null;
@@ -26,6 +29,8 @@ interface UiState {
   form: { service?: Service } | null;
   pendingDelete: Service | null;
   selectedId: string | null;
+  setView: (view: AppView) => void;
+  toggleMonitor: () => void;
   setSettingsOpen: (open: boolean) => void;
   toggleSettings: () => void;
   setAboutOpen: (open: boolean) => void;
@@ -49,6 +54,7 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
+  view: "workspace",
   settingsOpen: false,
   checkingForUpdates: false,
   availableUpdate: null,
@@ -68,6 +74,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   pendingDelete: null,
   selectedId: null,
 
+  setView: (view) =>
+    set({ view, settingsOpen: false, searchOpen: false, searchQuery: "" }),
+  toggleMonitor: () =>
+    set((current) => ({
+      view: current.view === "monitor" ? "workspace" : "monitor",
+      settingsOpen: false,
+      searchOpen: false,
+      searchQuery: "",
+    })),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   toggleSettings: () =>
     set((current) => ({ settingsOpen: !current.settingsOpen })),
@@ -77,7 +92,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ quitConfirmationOpen }),
   setLifecycleError: (lifecycleError) => set({ lifecycleError }),
   setNotice: (notice) => set({ notice }),
-  setSearchOpen: (searchOpen) => set({ searchOpen }),
+  setSearchOpen: (searchOpen) =>
+    set(searchOpen ? { searchOpen, view: "workspace" } : { searchOpen }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setLogServiceId: (logServiceId) => set({ logServiceId }),
   openEditor: (service) =>

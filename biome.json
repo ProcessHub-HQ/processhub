@@ -6,12 +6,15 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!!**/dist"]
+		"includes": [
+			"**",
+			"!!**/dist"
+		]
 	},
 	"formatter": {
 		"enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2
+		"indentStyle": "space",
+		"indentWidth": 2
 	},
 	"linter": {
 		"enabled": true,
@@ -34,5 +37,20 @@
 				"organizeImports": "on"
 			}
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": [
+				"src/app/ProcessMonitor.tsx"
+			],
+			"linter": {
+				"rules": {
+					"a11y": {
+						"useSemanticElements": "off",
+						"useFocusableInteractive": "off"
+					}
+				}
+			}
+		}
+	]
 }

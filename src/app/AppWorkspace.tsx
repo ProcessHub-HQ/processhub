@@ -6,6 +6,7 @@ import { ServiceSearch } from "../components/ServiceSearch";
 import { useServicesStore } from "../stores/servicesStore";
 import { useUiStore } from "../stores/uiStore";
 import { AppDialogs } from "./AppDialogs";
+import { ProcessMonitor } from "./ProcessMonitor";
 import { useAppCommands } from "./useAppCommands";
 import { useAppShortcuts } from "./useAppShortcuts";
 import { useProcessHubEvents } from "./useProcessHubEvents";
@@ -23,6 +24,7 @@ export function AppWorkspace() {
   const notice = useUiStore((state) => state.notice);
   const setNotice = useUiStore((state) => state.setNotice);
   const setLifecycleError = useUiStore((state) => state.setLifecycleError);
+  const view = useUiStore((state) => state.view);
   const searchOpen = useUiStore((state) => state.searchOpen);
   const searchQuery = useUiStore((state) => state.searchQuery);
   const setSearchOpen = useUiStore((state) => state.setSearchOpen);
@@ -60,17 +62,23 @@ export function AppWorkspace() {
           </button>
         </div>
       )}
-      {searchOpen && (
-        <ServiceSearch
-          value={searchQuery}
-          onChange={setSearchQuery}
-          onClose={() => {
-            setSearchOpen(false);
-            setSearchQuery("");
-          }}
-        />
+      {view === "monitor" ? (
+        <ProcessMonitor />
+      ) : (
+        <>
+          {searchOpen && (
+            <ServiceSearch
+              value={searchQuery}
+              onChange={setSearchQuery}
+              onClose={() => {
+                setSearchOpen(false);
+                setSearchQuery("");
+              }}
+            />
+          )}
+          <WorkspaceContent />
+        </>
       )}
-      <WorkspaceContent />
       <AppDialogs />
     </AppShell>
   );
